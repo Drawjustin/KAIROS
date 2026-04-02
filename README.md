@@ -58,7 +58,7 @@ KAIROS는 다음과 같은 구성으로 동작합니다.
 요청은 Gateway를 통해 들어오고, 정책 검증과 라우팅을 거쳐 적절한 AI provider로 전달됩니다. 응답 이후에는 사용량, 비용, 실패 이벤트가 비동기적으로 수집되며, 운영자는 대시보드를 통해 전체 상태를 확인할 수 있습니다.
 
 ## Tech Stack
-
+- Java
 - Kotlin
 - Spring Boot
 - PostgreSQL
@@ -66,13 +66,6 @@ KAIROS는 다음과 같은 구성으로 동작합니다.
 - Kafka
 - Prometheus
 - Grafana
-- Loki
-- Tempo
-- OpenTelemetry
-- Resilience4j
-- Docker Compose
-- k6
-- Testcontainers
 
 ## What This Project Demonstrates
 
