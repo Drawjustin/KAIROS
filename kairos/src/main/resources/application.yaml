@@ -1,5 +1,7 @@
 spring:
   config:
     import: optional:file:.env[.properties],optional:file:.env.local[.properties]
+  profiles:
+    default: local
   application:
     name: ${KAIROS_APP_NAME:kairos}
