@@ -1,0 +1,12 @@
+spring:
+  datasource:
+    url: ${KAIROS_API_DB_URL}
+    username: ${KAIROS_API_DB_USERNAME}
+    password: ${KAIROS_API_DB_PASSWORD}
+  jpa:
+    hibernate:
+      ddl-auto: ${KAIROS_API_JPA_DDL_AUTO:update}
+    show-sql: ${KAIROS_API_JPA_SHOW_SQL:true}
+    properties:
+      hibernate:
+        format_sql: true

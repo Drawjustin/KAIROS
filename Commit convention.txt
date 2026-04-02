@@ -1,0 +1,39 @@
+# commit message 작성 시 컨벤션 주의
+
+- 타입(스코프): 설명 형식으로 작성해야 커밋이 됨
+- 예시는 아래와 같음
+
+```
+feat(client): 새 기능
+fix(server): 버그 수정
+chore: 설정, 패키지 등 코드와 무관한 작업
+docs: 문서 수정
+refactor(shared): 코드 리팩토링
+test(server): 테스트 추가
+```
+
+- 타입에 들어갈 수 있는건 아래 참고
+
+```
+'build', 
+'chore', 
+'ci', 
+'docs', 
+'feat', 
+'fix', 
+'perf', 
+'refactor', 
+'revert', 
+'style', 
+'test'
+```
+
+- 스코프에 들어갈 수 있는건 아래 참고
+
+```
+  'client', // Angular 앱
+  'server', // NestJS 앱
+  'shared', // 공유 라이브러리
+  'ci', // CI/CD
+  'deps', // 의존성
+```
