@@ -9,7 +9,7 @@ spring:
   jpa:
     hibernate:
       ddl-auto: ${KAIROS_API_JPA_DDL_AUTO:none}
-    show-sql: ${KAIROS_API_JPA_SHOW_SQL:true}
+#    show-sql: ${KAIROS_API_JPA_SHOW_SQL:true}
     properties:
       hibernate:
         format_sql: true

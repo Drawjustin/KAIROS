@@ -1,0 +1,53 @@
+package io.github.drawjustin.kairos.auth.security
+
+import io.github.drawjustin.kairos.util.Jwt
+import io.jsonwebtoken.JwtException
+import jakarta.servlet.FilterChain
+import jakarta.servlet.http.HttpServletRequest
+import jakarta.servlet.http.HttpServletResponse
+import org.springframework.http.HttpHeaders
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken
+import org.springframework.security.core.authority.SimpleGrantedAuthority
+import org.springframework.security.core.context.SecurityContextHolder
+import org.springframework.stereotype.Component
+import org.springframework.web.filter.OncePerRequestFilter
+
+@Component
+class JwtAuthenticationFilter(
+    private val jwt: Jwt,
+) : OncePerRequestFilter() {
+    override fun doFilterInternal(
+        request: HttpServletRequest,
+        response: HttpServletResponse,
+        filterChain: FilterChain,
+    ) {
+        val header = request.getHeader(HttpHeaders.AUTHORIZATION)
+        val token = header
+            ?.takeIf { it.startsWith("Bearer ") }
+            ?.removePrefix("Bearer ")
+            ?.trim()
+
+        if (!token.isNullOrBlank() && SecurityContextHolder.getContext().authentication == null) {
+            try {
+                val claims = jwt.parse(token)
+                if (jwt.isAccessToken(claims)) {
+                    val principal = AuthenticatedUser(
+                        id = jwt.userId(claims),
+                        email = jwt.email(claims),
+                        role = jwt.role(claims),
+                    )
+                    val authentication = UsernamePasswordAuthenticationToken(
+                        principal,
+                        null,
+                        listOf(SimpleGrantedAuthority("ROLE_${principal.role}")),
+                    )
+                    SecurityContextHolder.getContext().authentication = authentication
+                }
+            } catch (_: JwtException) {
+            } catch (_: IllegalArgumentException) {
+            }
+        }
+
+        filterChain.doFilter(request, response)
+    }
+}

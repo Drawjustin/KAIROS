@@ -5,3 +5,10 @@ spring:
     default: local
   application:
     name: ${KAIROS_APP_NAME:kairos}
+
+kairos:
+  jwt:
+    issuer: ${KAIROS_JWT_ISSUER:kairos}
+    secret: ${KAIROS_JWT_SECRET}
+    access-token-expiration: ${KAIROS_JWT_ACCESS_TOKEN_EXPIRATION:15m}
+    refresh-token-expiration: ${KAIROS_JWT_REFRESH_TOKEN_EXPIRATION:30d}
