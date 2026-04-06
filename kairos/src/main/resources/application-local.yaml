@@ -3,9 +3,12 @@ spring:
     url: ${KAIROS_API_DB_URL}
     username: ${KAIROS_API_DB_USERNAME}
     password: ${KAIROS_API_DB_PASSWORD}
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
   jpa:
     hibernate:
-      ddl-auto: ${KAIROS_API_JPA_DDL_AUTO:update}
+      ddl-auto: ${KAIROS_API_JPA_DDL_AUTO:none}
     show-sql: ${KAIROS_API_JPA_SHOW_SQL:true}
     properties:
       hibernate:
