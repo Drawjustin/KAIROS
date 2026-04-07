@@ -1,17 +1,21 @@
 spring:
+  # 통합 테스트도 실제 마이그레이션을 그대로 적용해 스키마 차이를 줄인다.
   flyway:
     enabled: true
     locations: classpath:db/migration
   jpa:
+    # 테스트에서 엔티티와 실제 테이블 정의가 어긋나면 바로 실패하게 한다.
     hibernate:
       ddl-auto: validate
     show-sql: false
 server:
   error:
+    # MockMvc 테스트에서 에러 메시지 검증이 가능하도록 항상 포함한다.
     include-message: always
 
 kairos:
   jwt:
+    # 테스트 전용 고정 키와 만료 시간을 써서 재현 가능성을 높인다.
     issuer: test-kairos
     secret: test-secret-test-secret-test-secret-12345
     access-token-expiration: 15m

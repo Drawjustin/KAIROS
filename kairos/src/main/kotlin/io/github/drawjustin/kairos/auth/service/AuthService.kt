@@ -18,6 +18,7 @@ import org.springframework.transaction.annotation.Transactional
 import org.springframework.web.server.ResponseStatusException
 
 @Service
+// 회원가입, 로그인, refresh rotation, 로그아웃을 한곳에서 관리한다.
 class AuthService(
     private val userRepository: UserRepository,
     private val refreshSessionRepository: RefreshSessionRepository,
@@ -39,6 +40,7 @@ class AuthService(
         )
         val user: User = userRepository.save(newUser)
 
+        // 첫 로그인과 같은 효과로 바로 세션을 만들어 UX를 단순하게 한다.
         return createSession(user, metadata)
     }
 
@@ -52,6 +54,7 @@ class AuthService(
             throw ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid credentials")
         }
 
+        // 로그인 성공 시 기존 세션과 별개로 새 refresh 세션을 발급한다.
         return createSession(user, metadata)
     }
 
@@ -82,6 +85,7 @@ class AuthService(
         }
 
         if (session.expiresAt.isBefore(Instant.now())) {
+            // 만료된 세션은 다음 요청부터도 바로 거부되도록 폐기 상태로 남긴다.
             session.revoke()
             refreshSessionRepository.save(session)
             throw ResponseStatusException(HttpStatus.UNAUTHORIZED, "Refresh token expired")
@@ -123,12 +127,14 @@ class AuthService(
 
     @Transactional(readOnly = true)
     fun findUser(userId: Long): User {
+        // /me 같은 인증 후 조회에서 공통으로 사용한다.
         return userRepository.findById(userId)
             .orElseThrow { ResponseStatusException(HttpStatus.NOT_FOUND, "User not found") }
     }
 
     private fun createSession(user: User, metadata: SessionMetadata): AuthResponse {
         val userId = requireNotNull(user.id) { "User id must exist before creating a session" }
+        // access token은 stateless, refresh token은 DB 세션과 함께 발급한다.
         val refreshIssue = jwt.generateRefreshToken(userId)
         // 서버는 refresh token 원문 대신 해시만 저장한다.
         val refreshSession = RefreshSession(
@@ -143,6 +149,7 @@ class AuthService(
         )
         val savedSession: RefreshSession = refreshSessionRepository.save(refreshSession)
 
+        // 클라이언트는 원문 refresh token을 지금 응답에서만 받을 수 있다.
         return AuthResponse(
             accessToken = jwt.generateAccessToken(user),
             refreshToken = refreshIssue.token,

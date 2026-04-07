@@ -28,6 +28,7 @@ import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 @SpringBootTest
 @ActiveProfiles("test")
 @AutoConfigureMockMvc
+// 실제 HTTP 요청, Security, JWT, DB 세션이 함께 맞물리는 인증 시나리오를 검증한다.
 class AuthIntegrationTests : IntegrationTestSupport() {
     @Autowired
     lateinit var mockMvc: MockMvc
@@ -180,6 +181,7 @@ class AuthIntegrationTests : IntegrationTestSupport() {
     }
 
     private fun register(request: RegisterRequest): AuthResponse {
+        // 테스트 본문에서는 핵심 시나리오만 보이도록 HTTP 호출 세부는 헬퍼로 감싼다.
         val result = mockMvc.perform(
             post("/api/auth/register")
                 .contentType(MediaType.APPLICATION_JSON)
@@ -192,6 +194,7 @@ class AuthIntegrationTests : IntegrationTestSupport() {
     }
 
     private fun login(request: LoginRequest): AuthResponse {
+        // 로그인 성공 응답을 객체로 바로 역직렬화해 테스트 가독성을 높인다.
         val result = mockMvc.perform(
             post("/api/auth/login")
                 .contentType(MediaType.APPLICATION_JSON)
@@ -204,6 +207,7 @@ class AuthIntegrationTests : IntegrationTestSupport() {
     }
 
     private fun refresh(request: RefreshRequest): AuthResponse {
+        // refresh 재발급 시나리오도 동일한 방식으로 재사용 가능하게 뽑아둔다.
         val result = mockMvc.perform(
             post("/api/auth/refresh")
                 .contentType(MediaType.APPLICATION_JSON)

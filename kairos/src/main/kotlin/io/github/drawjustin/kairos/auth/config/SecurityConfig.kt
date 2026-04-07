@@ -19,11 +19,13 @@ class SecurityConfig(
     @Bean
     fun securityFilterChain(http: HttpSecurity): SecurityFilterChain {
         return http
+            // 브라우저 세션 기반 앱이 아니라 JWT 기반 API라 기본 폼/세션 기능을 끈다.
             .csrf { it.disable() }
             .httpBasic { it.disable() }
             .formLogin { it.disable() }
             .sessionManagement { it.sessionCreationPolicy(SessionCreationPolicy.STATELESS) }
             .authorizeHttpRequests {
+                // 회원가입, 로그인, 토큰 재발급은 인증 전에도 접근 가능해야 한다.
                 it.requestMatchers(
                     "/api/auth/register",
                     "/api/auth/login",
@@ -33,10 +35,12 @@ class SecurityConfig(
                     .requestMatchers("/error").permitAll()
                     .anyRequest().authenticated()
             }
+            // username/password 필터보다 먼저 JWT를 읽어 SecurityContext를 채운다.
             .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter::class.java)
             .build()
     }
 
     @Bean
+    // DB에는 평문 비밀번호가 아니라 bcrypt 해시만 저장한다.
     fun passwordEncoder(): PasswordEncoder = BCryptPasswordEncoder()
 }

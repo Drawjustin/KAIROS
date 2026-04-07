@@ -1,5 +1,6 @@
 spring:
   config:
+    # 로컬 실행 시 .env/.env.local 값을 선택적으로 읽어온다.
     import: optional:file:.env/.env.local[.properties]
   profiles:
     default: local
@@ -8,6 +9,7 @@ spring:
 
 kairos:
   jwt:
+    # 운영/개발 환경 모두 환경 변수로 바꿔 끼울 수 있게 열어둔다.
     issuer: ${KAIROS_JWT_ISSUER:kairos}
     secret: ${KAIROS_JWT_SECRET}
     access-token-expiration: ${KAIROS_JWT_ACCESS_TOKEN_EXPIRATION:15m}

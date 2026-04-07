@@ -7,6 +7,7 @@ import org.testcontainers.junit.jupiter.Container
 import org.testcontainers.junit.jupiter.Testcontainers
 
 @Testcontainers
+// 기능별 통합 테스트가 공통 PostgreSQL 컨테이너 설정을 재사용하도록 돕는다.
 abstract class IntegrationTestSupport {
     companion object {
         @Container
@@ -16,6 +17,7 @@ abstract class IntegrationTestSupport {
 
     @JvmStatic
     @DynamicPropertySource
+    // SpringBootTest가 뜰 때 datasource를 컨테이너 DB로 연결한다.
     fun configureProperties(registry: DynamicPropertyRegistry) {
         // 컨테이너가 띄운 접속 정보를 Spring datasource로 주입한다.
         registry.add("spring.datasource.url", postgres::getJdbcUrl)

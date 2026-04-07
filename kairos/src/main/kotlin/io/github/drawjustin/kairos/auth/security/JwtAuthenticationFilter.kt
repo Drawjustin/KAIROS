@@ -43,6 +43,7 @@ class JwtAuthenticationFilter(
                         null,
                         listOf(SimpleGrantedAuthority("ROLE_${principal.role}")),
                     )
+                    // 이후 컨트롤러에서는 @AuthenticationPrincipal로 이 값을 바로 꺼낼 수 있다.
                     SecurityContextHolder.getContext().authentication = authentication
                 }
             } catch (_: JwtException) {

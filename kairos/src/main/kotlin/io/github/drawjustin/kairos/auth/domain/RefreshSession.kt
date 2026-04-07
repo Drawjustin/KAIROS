@@ -14,6 +14,7 @@ import java.time.Instant
 
 @Entity
 @Table(name = "refresh_sessions")
+// 각 refresh token의 서버 측 상태를 관리하는 엔티티다.
 class RefreshSession(
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -24,9 +25,11 @@ class RefreshSession(
     val user: User,
 
     @Column(name = "session_id", nullable = false, unique = true, length = 100)
+    // JWT 안의 sid claim과 매칭되는 서버 측 세션 식별자다.
     val sessionId: String,
 
     @Column(name = "token_hash", nullable = false, length = 128)
+    // 원문 refresh token 대신 해시만 저장해 DB 유출 시 피해를 줄인다.
     var tokenHash: String,
 
     @Column(name = "expires_at", nullable = false)
@@ -56,11 +59,13 @@ class RefreshSession(
     @Column(name = "updated_at", nullable = false)
     var updatedAt: Instant = Instant.now(),
 ) {
+    // 로그아웃, rotation, 재사용 탐지 시 세션을 폐기 상태로 바꾼다.
     fun revoke(now: Instant = Instant.now()) {
         revokedAt = now
         updatedAt = now
     }
 
+    // 정상적으로 사용된 마지막 시각을 남겨 추적 가능하게 한다.
     fun markUsed(now: Instant = Instant.now()) {
         lastUsedAt = now
         updatedAt = now

@@ -14,6 +14,7 @@ import javax.crypto.SecretKey
 import org.springframework.stereotype.Component
 
 @Component
+// JWT 생성과 claim 해석을 한곳에 모아 서비스 코드가 토큰 포맷을 몰라도 되게 한다.
 class Jwt(
     private val properties: JwtProperties,
 ) {
@@ -76,14 +77,18 @@ class Jwt(
 
     fun isRefreshToken(claims: Claims): Boolean = claims.get("typ", String::class.java) == "refresh"
 
+    // subject는 항상 사용자 id 문자열로 넣어두었다.
     fun userId(claims: Claims): Long = claims.subject.toLong()
 
+    // refresh token에만 들어 있는 세션 식별자다.
     fun sessionId(claims: Claims): String = claims.get("sid", String::class.java)
 
+    // access token의 사용자 표시 정보는 컨텍스트 구성에 사용한다.
     fun email(claims: Claims): String = claims.get("email", String::class.java)
 
     fun role(claims: Claims): String = claims.get("role", String::class.java)
 
+    // 로그아웃처럼 예외를 삼키고 싶을 때 빠르게 유효성만 확인한다.
     fun isInvalid(token: String): Boolean =
         try {
             parse(token)
@@ -94,6 +99,7 @@ class Jwt(
             true
         }
 
+    // refresh token 발급 결과를 DB 세션 생성에 바로 넘기기 위한 묶음이다.
     data class RefreshTokenIssue(
         val token: String,
         val sessionId: String,

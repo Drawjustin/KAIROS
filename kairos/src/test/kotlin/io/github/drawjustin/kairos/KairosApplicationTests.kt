@@ -6,6 +6,7 @@ import org.springframework.test.context.ActiveProfiles
 
 @SpringBootTest
 @ActiveProfiles("test")
+// 가장 얇은 smoke test로 앱 전체 wiring이 깨지지 않았는지만 본다.
 class KairosApplicationTests : IntegrationTestSupport() {
 
 	@Test

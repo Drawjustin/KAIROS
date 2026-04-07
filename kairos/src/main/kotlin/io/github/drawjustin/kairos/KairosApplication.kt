@@ -5,6 +5,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication
 import org.springframework.boot.runApplication
 
 @SpringBootApplication
+// JwtProperties 같은 설정 객체를 @ConfigurationProperties로 자동 등록한다.
 @ConfigurationPropertiesScan
 class KairosApplication
 
