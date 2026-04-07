@@ -27,10 +27,12 @@ class JwtAuthenticationFilter(
             ?.removePrefix("Bearer ")
             ?.trim()
 
+        // 이미 다른 인증 방식이 채운 컨텍스트는 덮어쓰지 않는다.
         if (!token.isNullOrBlank() && SecurityContextHolder.getContext().authentication == null) {
             try {
                 val claims = jwt.parse(token)
                 if (jwt.isAccessToken(claims)) {
+                    // access token의 claim을 SecurityContext용 principal/authority로 옮긴다.
                     val principal = AuthenticatedUser(
                         id = jwt.userId(claims),
                         email = jwt.email(claims),
@@ -44,6 +46,7 @@ class JwtAuthenticationFilter(
                     SecurityContextHolder.getContext().authentication = authentication
                 }
             } catch (_: JwtException) {
+                // 유효하지 않은 토큰은 인증 없이 다음 필터로 넘긴다.
             } catch (_: IllegalArgumentException) {
             }
         }

@@ -17,6 +17,7 @@ import org.springframework.stereotype.Component
 class Jwt(
     private val properties: JwtProperties,
 ) {
+    // jjwt는 충분히 긴 바이트 배열을 HMAC 키로 사용한다.
     private val secretKey: SecretKey =
         Keys.hmacShaKeyFor(properties.secret.toByteArray(StandardCharsets.UTF_8))
 
@@ -28,6 +29,7 @@ class Jwt(
         val userId = requireNotNull(user.id) { "User id must exist before generating an access token" }
         val expiresAt = accessTokenExpiresAt()
 
+        // 일반 API 인증에만 쓰는 짧은 수명의 토큰이다.
         return Jwts.builder()
             .issuer(properties.issuer)
             .subject(userId.toString())
@@ -41,6 +43,7 @@ class Jwt(
     }
 
     fun generateRefreshToken(userId: Long): RefreshTokenIssue {
+        // refresh token은 DB 세션과 연결하기 위해 별도 session id를 가진다.
         val sessionId = UUID.randomUUID().toString()
         val expiresAt = refreshTokenExpiresAt()
 
@@ -68,17 +71,18 @@ class Jwt(
             .parseSignedClaims(token)
             .payload
 
-    fun isAccessToken(claims: Claims): Boolean = claims["typ"] == "access"
+    // typ claim으로 access/refresh를 구분한다.
+    fun isAccessToken(claims: Claims): Boolean = claims.get("typ", String::class.java) == "access"
 
-    fun isRefreshToken(claims: Claims): Boolean = claims["typ"] == "refresh"
+    fun isRefreshToken(claims: Claims): Boolean = claims.get("typ", String::class.java) == "refresh"
 
     fun userId(claims: Claims): Long = claims.subject.toLong()
 
-    fun sessionId(claims: Claims): String = claims["sid"] as String
+    fun sessionId(claims: Claims): String = claims.get("sid", String::class.java)
 
-    fun email(claims: Claims): String = claims["email"] as String
+    fun email(claims: Claims): String = claims.get("email", String::class.java)
 
-    fun role(claims: Claims): String = claims["role"] as String
+    fun role(claims: Claims): String = claims.get("role", String::class.java)
 
     fun isInvalid(token: String): Boolean =
         try {
