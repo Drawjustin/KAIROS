@@ -1,4 +1,3 @@
--- refresh token의 서버 측 상태와 디바이스 메타데이터를 관리한다.
 create table if not exists refresh_sessions (
     id bigserial primary key,
     user_id bigint not null references users(id) on delete cascade,
@@ -15,6 +14,5 @@ create table if not exists refresh_sessions (
     updated_at timestamp with time zone not null default current_timestamp
 );
 
--- 사용자 기준 정리와 만료 정리에 자주 쓰는 컬럼에 인덱스를 둔다.
 create index if not exists idx_refresh_sessions_user_id on refresh_sessions(user_id);
 create index if not exists idx_refresh_sessions_expires_at on refresh_sessions(expires_at);

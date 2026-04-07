@@ -2,12 +2,16 @@ package io.github.drawjustin.kairos.auth
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import io.github.drawjustin.kairos.IntegrationTestSupport
+import io.github.drawjustin.kairos.auth.dto.AuthOutput
 import io.github.drawjustin.kairos.auth.dto.AuthResponse
 import io.github.drawjustin.kairos.auth.dto.LoginRequest
+import io.github.drawjustin.kairos.auth.dto.LogoutResponse
 import io.github.drawjustin.kairos.auth.dto.LogoutRequest
 import io.github.drawjustin.kairos.auth.dto.MeResponse
 import io.github.drawjustin.kairos.auth.dto.RefreshRequest
 import io.github.drawjustin.kairos.auth.dto.RegisterRequest
+import io.github.drawjustin.kairos.common.api.BaseOutput
+import io.github.drawjustin.kairos.common.error.KairosErrorCode
 import io.github.drawjustin.kairos.auth.repository.RefreshSessionRepository
 import io.github.drawjustin.kairos.user.repository.UserRepository
 import org.assertj.core.api.Assertions.assertThat
@@ -89,8 +93,8 @@ class AuthIntegrationTests : IntegrationTestSupport() {
             .andReturn()
 
         val response = objectMapper.readValue(result.response.contentAsByteArray, MeResponse::class.java)
-        assertThat(response.email).isEqualTo("me@example.com")
-        assertThat(response.role).isEqualTo("USER")
+        assertThat(response.result.email).isEqualTo("me@example.com")
+        assertThat(response.result.role).isEqualTo("USER")
     }
 
     @Test
@@ -152,7 +156,11 @@ class AuthIntegrationTests : IntegrationTestSupport() {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsBytes(LogoutRequest(loginResponse.refreshToken))),
         )
-            .andExpect(status().isNoContent)
+            .andExpect(status().isOk)
+            .andExpect { result ->
+                val response = objectMapper.readValue(result.response.contentAsByteArray, LogoutResponse::class.java)
+                assertThat(response.result.success).isTrue()
+            }
 
         // 로그아웃한 refresh token으로는 더 이상 재발급되면 안 된다.
         mockMvc.perform(
@@ -178,9 +186,13 @@ class AuthIntegrationTests : IntegrationTestSupport() {
                 ),
         )
             .andExpect(status().isBadRequest)
+            .andExpect { result ->
+                val response = objectMapper.readValue(result.response.contentAsByteArray, BaseOutput::class.java)
+                assertThat(response.errorCode).isEqualTo(KairosErrorCode.INVALID_INPUT.code)
+            }
     }
 
-    private fun register(request: RegisterRequest): AuthResponse {
+    private fun register(request: RegisterRequest): AuthOutput {
         // 테스트 본문에서는 핵심 시나리오만 보이도록 HTTP 호출 세부는 헬퍼로 감싼다.
         val result = mockMvc.perform(
             post("/api/auth/register")
@@ -190,10 +202,10 @@ class AuthIntegrationTests : IntegrationTestSupport() {
             .andExpect(status().isOk)
             .andReturn()
 
-        return objectMapper.readValue(result.response.contentAsByteArray, AuthResponse::class.java)
+        return objectMapper.readValue(result.response.contentAsByteArray, AuthResponse::class.java).result
     }
 
-    private fun login(request: LoginRequest): AuthResponse {
+    private fun login(request: LoginRequest): AuthOutput {
         // 로그인 성공 응답을 객체로 바로 역직렬화해 테스트 가독성을 높인다.
         val result = mockMvc.perform(
             post("/api/auth/login")
@@ -203,10 +215,10 @@ class AuthIntegrationTests : IntegrationTestSupport() {
             .andExpect(status().isOk)
             .andReturn()
 
-        return objectMapper.readValue(result.response.contentAsByteArray, AuthResponse::class.java)
+        return objectMapper.readValue(result.response.contentAsByteArray, AuthResponse::class.java).result
     }
 
-    private fun refresh(request: RefreshRequest): AuthResponse {
+    private fun refresh(request: RefreshRequest): AuthOutput {
         // refresh 재발급 시나리오도 동일한 방식으로 재사용 가능하게 뽑아둔다.
         val result = mockMvc.perform(
             post("/api/auth/refresh")
@@ -216,14 +228,16 @@ class AuthIntegrationTests : IntegrationTestSupport() {
             .andExpect(status().isOk)
             .andReturn()
 
-        return objectMapper.readValue(result.response.contentAsByteArray, AuthResponse::class.java)
+        return objectMapper.readValue(result.response.contentAsByteArray, AuthResponse::class.java).result
     }
 
     private fun ResultActions.assertUnauthorized(expectedMessage: String) {
-        // 현재 에러 응답은 JSON body가 아니라 status + errorMessage 중심으로 검증한다.
+        // 공통 에러 응답 포맷이 적용되었는지 함께 검증한다.
         andExpect(status().isUnauthorized)
             .andExpect { result ->
-                assertThat(result.response.errorMessage).isEqualTo(expectedMessage)
+                val response = objectMapper.readValue(result.response.contentAsByteArray, BaseOutput::class.java)
+                assertThat(response.errorMessage).isEqualTo(expectedMessage)
+                assertThat(response.errorCode).isNotBlank()
             }
     }
 }

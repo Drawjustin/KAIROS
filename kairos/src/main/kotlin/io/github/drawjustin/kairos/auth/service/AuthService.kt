@@ -2,20 +2,21 @@ package io.github.drawjustin.kairos.auth.service
 
 import io.github.drawjustin.kairos.auth.domain.RefreshSession
 import io.github.drawjustin.kairos.auth.domain.SessionMetadata
+import io.github.drawjustin.kairos.auth.dto.AuthOutput
 import io.github.drawjustin.kairos.auth.dto.AuthResponse
 import io.github.drawjustin.kairos.auth.dto.LoginRequest
 import io.github.drawjustin.kairos.auth.dto.RegisterRequest
 import io.github.drawjustin.kairos.auth.repository.RefreshSessionRepository
+import io.github.drawjustin.kairos.common.error.KairosErrorCode
+import io.github.drawjustin.kairos.common.error.KairosException
 import io.github.drawjustin.kairos.user.entity.User
 import io.github.drawjustin.kairos.user.repository.UserRepository
 import io.github.drawjustin.kairos.util.Jwt
 import io.jsonwebtoken.JwtException
 import java.time.Instant
-import org.springframework.http.HttpStatus
 import org.springframework.security.crypto.password.PasswordEncoder
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
-import org.springframework.web.server.ResponseStatusException
 
 @Service
 // 회원가입, 로그인, refresh rotation, 로그아웃을 한곳에서 관리한다.
@@ -31,7 +32,7 @@ class AuthService(
         // 이메일은 비교 일관성을 위해 저장 전에 정규화한다.
         val normalizedEmail = request.email.trim().lowercase()
         if (userRepository.existsByEmail(normalizedEmail)) {
-            throw ResponseStatusException(HttpStatus.CONFLICT, "Email already in use")
+            throw KairosException(KairosErrorCode.EMAIL_ALREADY_IN_USE)
         }
 
         val newUser = User(
@@ -47,11 +48,11 @@ class AuthService(
     @Transactional
     fun login(request: LoginRequest, metadata: SessionMetadata): AuthResponse {
         val user = userRepository.findByEmail(request.email.trim().lowercase())
-            .orElseThrow { ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid credentials") }
+            .orElseThrow { KairosException(KairosErrorCode.INVALID_CREDENTIALS) }
 
         // 비밀번호가 틀리면 토큰 발급 없이 바로 종료한다.
         if (!passwordEncoder.matches(request.password, user.password)) {
-            throw ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid credentials")
+            throw KairosException(KairosErrorCode.INVALID_CREDENTIALS)
         }
 
         // 로그인 성공 시 기존 세션과 별개로 새 refresh 세션을 발급한다.
@@ -64,38 +65,38 @@ class AuthService(
         val claims = try {
             jwt.parse(refreshToken)
         } catch (_: JwtException) {
-            throw ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid refresh token")
+            throw KairosException(KairosErrorCode.INVALID_REFRESH_TOKEN)
         } catch (_: IllegalArgumentException) {
-            throw ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid refresh token")
+            throw KairosException(KairosErrorCode.INVALID_REFRESH_TOKEN)
         }
 
         if (!jwt.isRefreshToken(claims)) {
-            throw ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid refresh token")
+            throw KairosException(KairosErrorCode.INVALID_REFRESH_TOKEN)
         }
 
         val sessionId = jwt.sessionId(claims)
         val session = refreshSessionRepository.findBySessionId(sessionId)
-            ?: throw ResponseStatusException(HttpStatus.UNAUTHORIZED, "Refresh session not found")
+            ?: throw KairosException(KairosErrorCode.REFRESH_SESSION_NOT_FOUND)
 
         val sessionUserId = requireNotNull(session.user.id) { "Refresh session user id must exist" }
         if (session.revokedAt != null) {
             // 이미 폐기된 refresh token 재사용은 탈취 시도로 보고 모든 활성 세션을 끊는다.
             revokeAllActiveSessions(sessionUserId)
-            throw ResponseStatusException(HttpStatus.UNAUTHORIZED, "Refresh token reuse detected")
+            throw KairosException(KairosErrorCode.REFRESH_TOKEN_REUSE_DETECTED)
         }
 
         if (session.expiresAt.isBefore(Instant.now())) {
             // 만료된 세션은 다음 요청부터도 바로 거부되도록 폐기 상태로 남긴다.
             session.revoke()
             refreshSessionRepository.save(session)
-            throw ResponseStatusException(HttpStatus.UNAUTHORIZED, "Refresh token expired")
+            throw KairosException(KairosErrorCode.REFRESH_TOKEN_EXPIRED)
         }
 
         val hashedToken = tokenHasher.hash(refreshToken)
         if (session.tokenHash != hashedToken) {
             // 세션 id는 맞지만 토큰 원문이 다르면 위조 또는 재사용 가능성이 있다.
             revokeAllActiveSessions(sessionUserId)
-            throw ResponseStatusException(HttpStatus.UNAUTHORIZED, "Refresh token mismatch")
+            throw KairosException(KairosErrorCode.REFRESH_TOKEN_MISMATCH)
         }
 
         // refresh rotation: 기존 refresh는 폐기하고 새 세션으로 교체한다.
@@ -129,7 +130,7 @@ class AuthService(
     fun findUser(userId: Long): User {
         // /me 같은 인증 후 조회에서 공통으로 사용한다.
         return userRepository.findById(userId)
-            .orElseThrow { ResponseStatusException(HttpStatus.NOT_FOUND, "User not found") }
+            .orElseThrow { KairosException(KairosErrorCode.USER_NOT_FOUND) }
     }
 
     private fun createSession(user: User, metadata: SessionMetadata): AuthResponse {
@@ -151,11 +152,13 @@ class AuthService(
 
         // 클라이언트는 원문 refresh token을 지금 응답에서만 받을 수 있다.
         return AuthResponse(
-            accessToken = jwt.generateAccessToken(user),
-            refreshToken = refreshIssue.token,
-            accessTokenExpiresAt = jwt.accessTokenExpiresAt(),
-            refreshTokenExpiresAt = refreshIssue.expiresAt,
-            sessionId = savedSession.sessionId,
+            result = AuthOutput(
+                accessToken = jwt.generateAccessToken(user),
+                refreshToken = refreshIssue.token,
+                accessTokenExpiresAt = jwt.accessTokenExpiresAt(),
+                refreshTokenExpiresAt = refreshIssue.expiresAt,
+                sessionId = savedSession.sessionId,
+            ),
         )
     }
 

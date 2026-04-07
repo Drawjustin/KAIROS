@@ -1,8 +1,11 @@
 package io.github.drawjustin.kairos.auth.controller
 
 import io.github.drawjustin.kairos.auth.domain.SessionMetadata
+import io.github.drawjustin.kairos.auth.dto.AuthResponse
 import io.github.drawjustin.kairos.auth.dto.LoginRequest
+import io.github.drawjustin.kairos.auth.dto.LogoutResponse
 import io.github.drawjustin.kairos.auth.dto.LogoutRequest
+import io.github.drawjustin.kairos.auth.dto.MeOutput
 import io.github.drawjustin.kairos.auth.dto.MeResponse
 import io.github.drawjustin.kairos.auth.dto.RefreshRequest
 import io.github.drawjustin.kairos.auth.dto.RegisterRequest
@@ -10,7 +13,6 @@ import io.github.drawjustin.kairos.auth.security.AuthenticatedUser
 import io.github.drawjustin.kairos.auth.service.AuthService
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.validation.Valid
-import org.springframework.http.ResponseEntity
 import org.springframework.security.core.annotation.AuthenticationPrincipal
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PostMapping
@@ -32,7 +34,7 @@ class AuthController(
         httpServletRequest: HttpServletRequest,
         @RequestHeader(name = "X-Platform", required = false) platform: String?,
         @RequestHeader(name = "X-Device", required = false) device: String?,
-    ) = authService.register(request, httpServletRequest.toMetadata(platform, device))
+    ): AuthResponse = authService.register(request, httpServletRequest.toMetadata(platform, device))
 
     @PostMapping("/login")
     // 로그인 성공 시 새 refresh 세션을 만들고 access token도 함께 내려준다.
@@ -41,7 +43,7 @@ class AuthController(
         httpServletRequest: HttpServletRequest,
         @RequestHeader(name = "X-Platform", required = false) platform: String?,
         @RequestHeader(name = "X-Device", required = false) device: String?,
-    ) = authService.login(request, httpServletRequest.toMetadata(platform, device))
+    ): AuthResponse = authService.login(request, httpServletRequest.toMetadata(platform, device))
 
     @PostMapping("/refresh")
     // refresh token을 검증한 뒤 rotation된 새 토큰 쌍을 발급한다.
@@ -50,13 +52,13 @@ class AuthController(
         httpServletRequest: HttpServletRequest,
         @RequestHeader(name = "X-Platform", required = false) platform: String?,
         @RequestHeader(name = "X-Device", required = false) device: String?,
-    ) = authService.refresh(request.refreshToken, httpServletRequest.toMetadata(platform, device))
+    ): AuthResponse = authService.refresh(request.refreshToken, httpServletRequest.toMetadata(platform, device))
 
     @PostMapping("/logout")
     // refresh 세션만 폐기해서 이후 재발급을 막는다.
-    fun logout(@Valid @RequestBody request: LogoutRequest): ResponseEntity<Void> {
+    fun logout(@Valid @RequestBody request: LogoutRequest): LogoutResponse {
         authService.logout(request.refreshToken)
-        return ResponseEntity.noContent().build()
+        return LogoutResponse()
     }
 
     @GetMapping("/me")
@@ -65,9 +67,11 @@ class AuthController(
         val user = authService.findUser(principal.id)
         val userId = requireNotNull(user.id) { "Authenticated user id must exist" }
         return MeResponse(
-            id = userId,
-            email = user.email,
-            role = user.role,
+            result = MeOutput(
+                id = userId,
+                email = user.email,
+                role = user.role,
+            ),
         )
     }
 

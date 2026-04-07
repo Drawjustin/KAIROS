@@ -1,5 +1,6 @@
 package io.github.drawjustin.kairos.auth.dto
 
+import io.github.drawjustin.kairos.common.api.BaseOutput
 import jakarta.validation.constraints.Email
 import jakarta.validation.constraints.NotBlank
 import jakarta.validation.constraints.Size
@@ -38,8 +39,8 @@ data class LogoutRequest(
     val refreshToken: String,
 )
 
-// 로그인/회원가입/재발급 성공 시 클라이언트가 바로 사용할 토큰 묶음이다.
-data class AuthResponse(
+// 로그인/회원가입/재발급 시 result 안에 담길 실제 인증 데이터다.
+data class AuthOutput(
     val accessToken: String,
     val refreshToken: String,
     val tokenType: String = "Bearer",
@@ -48,9 +49,50 @@ data class AuthResponse(
     val sessionId: String,
 )
 
-// /me 응답은 인증된 사용자의 최소 공개 정보만 내려준다.
-data class MeResponse(
+// auth 최종 응답은 공통 메타를 상속하고 실제 데이터는 result에 담는다.
+data class AuthResponse(
+    val result: AuthOutput,
+    override val errorCode: String? = null,
+    override val errorMessage: String? = null,
+    override val slackError: Boolean? = null,
+) : BaseOutput(
+    errorCode = errorCode,
+    errorMessage = errorMessage,
+    slackError = slackError,
+)
+
+// /me에서 result 안에 담길 현재 사용자 정보다.
+data class MeOutput(
     val id: Long,
     val email: String,
     val role: String,
+)
+
+// /me 최종 응답은 공통 메타를 상속하고 사용자 정보는 result에 담는다.
+data class MeResponse(
+    val result: MeOutput,
+    override val errorCode: String? = null,
+    override val errorMessage: String? = null,
+    override val slackError: Boolean? = null,
+) : BaseOutput(
+    errorCode = errorCode,
+    errorMessage = errorMessage,
+    slackError = slackError,
+)
+
+// 로그아웃에서 result 안에 담길 최소 성공 정보다.
+data class LogoutOutput(
+    val success: Boolean = true,
+)
+
+// 로그아웃도 같은 응답 규격을 유지하면서 최소 성공 정보만 result에 담는다.
+data class LogoutResponse(
+    val result: LogoutOutput = LogoutOutput(),
+    override val errorCode: String? = null,
+    override val errorMessage: String? = null,
+    override val slackError: Boolean? = null,
+) : BaseOutput(
+    errorCode = errorCode,
+    errorMessage = errorMessage,
+    slackError = slackError,
 )
