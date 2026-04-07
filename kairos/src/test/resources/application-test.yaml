@@ -20,3 +20,7 @@ kairos:
     secret: test-secret-test-secret-test-secret-12345
     access-token-expiration: 15m
     refresh-token-expiration: 30d
+
+# 테스트는 기본적으로 실제 Slack으로 알림을 보내지 않는다.
+slack:
+  webhook-url: ${SLACK_WEBHOOK_URL:}

@@ -13,3 +13,6 @@ spring:
     properties:
       hibernate:
         format_sql: true
+
+slack:
+  webhook-url: ${SLACK_WEBHOOK_URL:}
