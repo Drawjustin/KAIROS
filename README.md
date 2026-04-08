@@ -1,104 +1,224 @@
-# KAIROS
+# Kairos
 
-Multi-LLM Gateway and Observability Platform
+Spring Boot + Kotlin 기반의 JWT 인증 API 프로젝트입니다.
 
-KAIROS는 여러 AI 모델 제공자를 하나의 일관된 API로 추상화하고, 인증/권한, 라우팅, 장애 대응, 비용 통제, 관측 가능성을 중앙화하는 백엔드 플랫폼입니다. 단순한 LLM 프록시가 아니라, 여러 서비스와 팀이 AI 기능을 안정적으로 운영할 수 있도록 돕는 `AI Gateway + 운영 플랫폼`을 목표로 합니다.
-
-## Why
-
-AI 기능을 서비스에 도입할 때 다음과 같은 문제가 자주 발생합니다.
-
-- 모델 제공자마다 API 형식이 다름
-- 어떤 팀이 어떤 모델을 얼마나 사용하는지 파악하기 어려움
-- 비용, 에러율, 지연시간을 통합 관리하기 어려움
-- 특정 provider 장애 시 전체 서비스가 영향을 받음
-- 요청량 증가에 대비한 quota, rate limit, budget 정책이 필요함
-
-KAIROS는 이런 문제를 해결하기 위해 설계되었습니다.
-
-## Goals
-
-- 여러 LLM provider를 하나의 API로 통합
-- tenant별 인증, 권한, quota, budget 정책 적용
-- fallback, retry, circuit breaker 기반 장애 대응
-- 요청 수, 응답시간, 에러율, 토큰 사용량, 비용 추적
-- Kafka 기반 비동기 이벤트 파이프라인 구축
-- Prometheus, Grafana, OpenTelemetry 기반 관측 환경 제공
-
-## Core Features
-
-- Unified AI API
-- Multi-provider routing
-- API key authentication
-- Tenant-based quota and budget control
-- Rate limiting
-- Fallback and resilience policies
-- Usage and cost tracking
-- Prometheus metrics
-- Structured logging
-- Distributed tracing
-- Kafka event pipeline
-- Admin APIs for platform operations
-
-## Architecture
-
-KAIROS는 다음과 같은 구성으로 동작합니다.
-
-- API Gateway
-- Routing Engine
-- Provider Adapters
-- Policy Service
-- Usage Service
-- Kafka Event Producer/Consumer
-- PostgreSQL
-- Redis
-- Prometheus / Grafana
-- Loki / Tempo
-
-요청은 Gateway를 통해 들어오고, 정책 검증과 라우팅을 거쳐 적절한 AI provider로 전달됩니다. 응답 이후에는 사용량, 비용, 실패 이벤트가 비동기적으로 수집되며, 운영자는 대시보드를 통해 전체 상태를 확인할 수 있습니다.
+현재는 인증 흐름과 공통 백엔드 기반 작업을 먼저 정리한 상태입니다.
 
 ## Tech Stack
-- Java
-- Kotlin
-- Spring Boot
+
+- Java 21
+- Kotlin 1.9.25
+- Spring Boot 3.5.13
+- Spring Security
+- Spring Data JPA
 - PostgreSQL
-- Redis
-- Kafka
-- Prometheus
-- Grafana
+- Flyway
+- Testcontainers
+- springdoc-openapi / Swagger UI
 
-## What This Project Demonstrates
+## Current Status
 
-이 프로젝트는 단순히 AI API를 호출하는 예제가 아니라, 실제 서비스 환경에서 필요한 백엔드 역량을 보여주는 데 초점을 맞춥니다.
+현재 구현/정리된 항목:
 
-- 멀티 provider 추상화
-- 운영 정책 중앙화
-- 장애 허용 설계
-- 비용 및 사용량 통제
-- 관측 가능성 확보
-- 비동기 이벤트 기반 데이터 처리
-- 플랫폼 백엔드 아키텍처 설계
+- JWT 기반 인증
+  - 회원가입
+  - 로그인
+  - access token / refresh token 발급
+  - refresh rotation
+  - refresh token 재사용 탐지
+  - 로그아웃 시 refresh session 폐기
+- 공통 응답 / 에러 포맷
+  - 성공 응답은 `result`
+  - 에러 응답은 `errorCode`, `errorMessage`
+- 공통 예외 처리
+  - `KairosException`
+  - `KairosErrorCode`
+  - `GlobalExceptionHandler`
+- 로깅 / 추적
+  - 요청 단위 `traceId`
+  - 응답 헤더 `X-Trace-Id`
+  - 요청 완료 로그
+  - 예외 로그 공통화
+- Slack 에러 알림
+  - 지정된 중요 에러만 Slack webhook 전송
+- JPA 공통 기반
+  - `BaseEntity`
+  - `createdAt`, `updatedAt`, `deletedAt`
+  - JPA Auditing 활성화
+- Soft delete 정책
+  - `deleted_at` 기반 soft delete
+  - 기본 조회 시 deleted row 제외
+  - 활성 사용자만 email unique
+- 보안 설정 정리
+  - `open-in-view=false`
+  - Spring Security 기본 generated password 제거
+- Swagger / OpenAPI 연동
+  - Swagger UI 접근 가능
+  - Bearer JWT 인증 스킴 설정
 
-## Target Use Cases
+## API Summary
 
-- 여러 팀이 공통 AI 인프라를 사용하는 환경
-- AI 기능을 서비스에 안전하게 도입하고 싶은 경우
-- 비용, 성능, 안정성을 함께 관리해야 하는 경우
-- LLM 서비스 운영을 위한 Gateway 계층이 필요한 경우
+인증 API:
 
-## Project Status
+- `POST /api/auth/register`
+- `POST /api/auth/login`
+- `POST /api/auth/refresh`
+- `POST /api/auth/logout`
+- `GET /api/auth/me`
 
-In Progress
+## Response Shape
 
-## Future Work
+성공 응답 예시:
 
-- Streaming response support
-- Semantic cache
-- OPA-based policy engine
-- Canary routing for new model rollout
-- Admin console UI
-- Usage anomaly detection
+```json
+{
+  "result": {
+    "accessToken": "...",
+    "refreshToken": "...",
+    "tokenType": "Bearer"
+  }
+}
+```
 
-## Motivation
+에러 응답 예시:
 
-이 프로젝트는 AI 시대에도 경쟁력 있는 서버 백엔드 개발자가 되기 위해, 단순 기능 개발을 넘어서 `운영 가능한 AI 플랫폼`을 직접 설계하고 구현하는 것을 목표로 시작했습니다. 특히 대규모 서비스 환경에서 중요한 인증, 정책, 장애 대응, 메트릭, 비용 관리 문제를 백엔드 관점에서 해결하는 데 집중합니다.
+```json
+{
+  "errorCode": "AUTH_003",
+  "errorMessage": "Invalid refresh token"
+}
+```
+
+추적용 `traceId`는 body가 아니라 응답 헤더 `X-Trace-Id`로 제공합니다.
+
+## JWT / Refresh Policy
+
+- access token은 짧은 수명의 stateless 토큰입니다.
+- refresh token은 DB의 `refresh_sessions`와 함께 관리합니다.
+- refresh 요청 시 refresh rotation을 수행합니다.
+- 이미 폐기된 refresh token 재사용이 감지되면 사용자 활성 세션을 모두 revoke합니다.
+
+## Soft Delete Policy
+
+- `users`, `refresh_sessions`는 soft delete를 사용합니다.
+- 삭제 시 실제 `DELETE` 대신 `deleted_at`이 기록됩니다.
+- 기본 조회에서는 `deleted_at is null` 데이터만 조회합니다.
+- `users.email`은 활성 사용자끼리만 unique합니다.
+- 추후 purge job으로 오래된 soft deleted row를 hard delete 할 수 있습니다.
+
+## Logging / Trace
+
+- 모든 응답 헤더에 `X-Trace-Id`를 포함합니다.
+- 예외 발생 시 서버 로그에서 같은 `traceId`로 검색할 수 있습니다.
+- 콘솔 로그 패턴에 MDC traceId가 포함되어 있습니다.
+
+## Swagger
+
+로컬 실행 후 접근:
+
+- `http://localhost:8080/swagger-ui/index.html`
+- `http://localhost:8080/v3/api-docs`
+
+설정 요약:
+
+- `springdoc-openapi-starter-webmvc-ui` 사용
+- `/swagger-ui/**`, `/v3/api-docs/**`는 security에서 `permitAll`
+- Bearer JWT 인증 스킴 등록
+
+운영에서는 Swagger 비활성화를 권장합니다.
+
+예시:
+
+```yaml
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
+```
+
+## Package Structure
+
+현재 구조는 상위는 기능별, 하위는 역할별로 나뉘어 있습니다.
+
+- `auth`
+  - `config`
+  - `controller`
+  - `domain`
+  - `dto`
+  - `repository`
+  - `security`
+  - `service`
+- `user`
+  - `controller`
+  - `entity`
+  - `repository`
+  - `service`
+- `common`
+  - `api`
+  - `error`
+  - `logging`
+  - `persistence`
+  - `slack`
+
+## Local Run
+
+기본 프로필은 `local`입니다.
+
+주요 환경변수:
+
+- `KAIROS_API_DB_URL`
+- `KAIROS_API_DB_USERNAME`
+- `KAIROS_API_DB_PASSWORD`
+- `KAIROS_JWT_SECRET`
+- `KAIROS_JWT_ISSUER` (optional, default: `kairos`)
+- `KAIROS_JWT_ACCESS_TOKEN_EXPIRATION` (optional, default: `15m`)
+- `KAIROS_JWT_REFRESH_TOKEN_EXPIRATION` (optional, default: `30d`)
+- `SLACK_WEBHOOK_URL` (optional)
+
+예시:
+
+```bash
+./gradlew bootRun
+```
+
+## Test
+
+인증 통합 테스트는 다음을 검증합니다.
+
+- 회원가입 / 로그인 / 내 정보 조회
+- refresh rotation
+- logout 후 refresh 차단
+- 입력 검증
+- soft deleted user 로그인 차단
+- soft delete 후 동일 이메일 재가입 허용
+- soft deleted refresh session 차단
+
+실행 예시:
+
+```bash
+./gradlew test --tests io.github.drawjustin.kairos.auth.AuthIntegrationTests
+```
+
+## Important Design Decisions
+
+- `open-in-view=false`
+  - 서비스 계층 안에서 필요한 데이터를 모두 조회하고 DTO로 변환합니다.
+- traceId는 헤더 전용
+  - 클라이언트는 `X-Trace-Id`를 서버 담당자에게 전달하면 됩니다.
+- `UserRole`은 enum 사용
+  - 문자열 하드코딩 대신 타입 안전성 확보
+- Swagger 취약점 대응
+  - `commons-lang3`는 `3.18.0`으로 명시 고정
+
+## Next Priorities
+
+현재 남은 우선순위:
+
+1. 전체 빌드 / 테스트 실제 검증
+2. Swagger 문서 예시값 / 설명 보강
+3. 운영용 설정 분리
+   - prod에서 Swagger 비활성화
+   - Slack / logging 수준 점검
+4. soft delete purge 전략 구체화
+5. 관리자 기능 또는 권한 확장 설계
