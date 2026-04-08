@@ -1,6 +1,4 @@
 package io.github.drawjustin.kairos.auth.security
-
-import io.github.drawjustin.kairos.util.Jwt
 import io.jsonwebtoken.JwtException
 import jakarta.servlet.FilterChain
 import jakarta.servlet.http.HttpServletRequest

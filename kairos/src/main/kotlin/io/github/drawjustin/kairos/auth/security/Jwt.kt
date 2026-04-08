@@ -1,4 +1,4 @@
-package io.github.drawjustin.kairos.util
+package io.github.drawjustin.kairos.auth.security
 
 import io.github.drawjustin.kairos.auth.config.JwtProperties
 import io.github.drawjustin.kairos.user.entity.User
