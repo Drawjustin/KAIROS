@@ -1,12 +1,12 @@
 package io.github.drawjustin.kairos.user.entity
 
+import io.github.drawjustin.kairos.common.persistence.BaseEntity
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
 import jakarta.persistence.GeneratedValue
 import jakarta.persistence.GenerationType
 import jakarta.persistence.Id
 import jakarta.persistence.Table
-import java.time.LocalDateTime
 
 @Entity
 @Table(name = "users")
@@ -27,10 +27,4 @@ class User(
     @Column(nullable = false)
     // 이후 권한 확장 시 관리자/사용자 구분의 기준이 된다.
     var role: String = "USER",
-
-    @Column(name = "created_at", nullable = false)
-    var createdAt: LocalDateTime = LocalDateTime.now(),
-
-    @Column(name = "updated_at", nullable = false)
-    var updatedAt: LocalDateTime = LocalDateTime.now(),
-)
+) : BaseEntity()

@@ -1,5 +1,6 @@
 package io.github.drawjustin.kairos.auth.domain
 
+import io.github.drawjustin.kairos.common.persistence.BaseEntity
 import io.github.drawjustin.kairos.user.entity.User
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
@@ -52,22 +53,14 @@ class RefreshSession(
 
     @Column(name = "user_agent", length = 1000)
     var userAgent: String? = null,
-
-    @Column(name = "created_at", nullable = false)
-    var createdAt: Instant = Instant.now(),
-
-    @Column(name = "updated_at", nullable = false)
-    var updatedAt: Instant = Instant.now(),
-) {
+) : BaseEntity() {
     // 로그아웃, rotation, 재사용 탐지 시 세션을 폐기 상태로 바꾼다.
     fun revoke(now: Instant = Instant.now()) {
         revokedAt = now
-        updatedAt = now
     }
 
     // 정상적으로 사용된 마지막 시각을 남겨 추적 가능하게 한다.
     fun markUsed(now: Instant = Instant.now()) {
         lastUsedAt = now
-        updatedAt = now
     }
 }
