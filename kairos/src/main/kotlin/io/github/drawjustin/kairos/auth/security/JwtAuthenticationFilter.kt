@@ -41,7 +41,7 @@ class JwtAuthenticationFilter(
                     val authentication = UsernamePasswordAuthenticationToken(
                         principal,
                         null,
-                        listOf(SimpleGrantedAuthority("ROLE_${principal.role}")),
+                        listOf(SimpleGrantedAuthority("ROLE_${principal.role.name}")),
                     )
                     // 이후 컨트롤러에서는 @AuthenticationPrincipal로 이 값을 바로 꺼낼 수 있다.
                     SecurityContextHolder.getContext().authentication = authentication

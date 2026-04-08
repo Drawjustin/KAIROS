@@ -2,6 +2,7 @@ package io.github.drawjustin.kairos.util
 
 import io.github.drawjustin.kairos.auth.config.JwtProperties
 import io.github.drawjustin.kairos.user.entity.User
+import io.github.drawjustin.kairos.user.entity.UserRole
 import io.jsonwebtoken.Claims
 import io.jsonwebtoken.JwtException
 import io.jsonwebtoken.Jwts
@@ -36,7 +37,7 @@ class Jwt(
             .subject(userId.toString())
             .claim("typ", "access")
             .claim("email", user.email)
-            .claim("role", user.role)
+            .claim("role", user.role.name)
             .issuedAt(Date.from(Instant.now()))
             .expiration(Date.from(expiresAt))
             .signWith(secretKey)
@@ -86,7 +87,7 @@ class Jwt(
     // access token의 사용자 표시 정보는 컨텍스트 구성에 사용한다.
     fun email(claims: Claims): String = claims.get("email", String::class.java)
 
-    fun role(claims: Claims): String = claims.get("role", String::class.java)
+    fun role(claims: Claims): UserRole = UserRole.valueOf(claims.get("role", String::class.java))
 
     // 로그아웃처럼 예외를 삼키고 싶을 때 빠르게 유효성만 확인한다.
     fun isInvalid(token: String): Boolean =

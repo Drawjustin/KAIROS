@@ -1,6 +1,7 @@
 package io.github.drawjustin.kairos.auth.dto
 
 import io.github.drawjustin.kairos.common.api.BaseOutput
+import io.github.drawjustin.kairos.user.entity.UserRole
 import jakarta.validation.constraints.Email
 import jakarta.validation.constraints.NotBlank
 import jakarta.validation.constraints.Size
@@ -58,7 +59,7 @@ data class AuthResponse(
 data class MeOutput(
     val id: Long,
     val email: String,
-    val role: String,
+    val role: UserRole,
 )
 
 // /me 최종 응답도 성공 시에는 사용자 정보만 result에 담아 내려준다.

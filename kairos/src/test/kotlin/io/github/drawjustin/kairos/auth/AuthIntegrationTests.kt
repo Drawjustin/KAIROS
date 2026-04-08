@@ -13,6 +13,7 @@ import io.github.drawjustin.kairos.auth.dto.RegisterRequest
 import io.github.drawjustin.kairos.common.api.BaseOutput
 import io.github.drawjustin.kairos.common.error.KairosErrorCode
 import io.github.drawjustin.kairos.auth.repository.RefreshSessionRepository
+import io.github.drawjustin.kairos.user.entity.UserRole
 import io.github.drawjustin.kairos.user.repository.UserRepository
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.BeforeEach
@@ -94,7 +95,7 @@ class AuthIntegrationTests : IntegrationTestSupport() {
 
         val response = objectMapper.readValue(result.response.contentAsByteArray, MeResponse::class.java)
         assertThat(response.result.email).isEqualTo("me@example.com")
-        assertThat(response.result.role).isEqualTo("USER")
+        assertThat(response.result.role).isEqualTo(UserRole.USER)
     }
 
     @Test

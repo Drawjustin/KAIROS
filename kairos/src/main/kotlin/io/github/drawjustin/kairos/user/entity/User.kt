@@ -3,6 +3,8 @@ package io.github.drawjustin.kairos.user.entity
 import io.github.drawjustin.kairos.common.persistence.BaseEntity
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
+import jakarta.persistence.EnumType
+import jakarta.persistence.Enumerated
 import jakarta.persistence.GeneratedValue
 import jakarta.persistence.GenerationType
 import jakarta.persistence.Id
@@ -26,5 +28,6 @@ class User(
 
     @Column(nullable = false)
     // 이후 권한 확장 시 관리자/사용자 구분의 기준이 된다.
-    var role: String = "USER",
+    @Enumerated(EnumType.STRING)
+    var role: UserRole,
 ) : BaseEntity()

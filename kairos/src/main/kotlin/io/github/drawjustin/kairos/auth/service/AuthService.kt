@@ -10,6 +10,7 @@ import io.github.drawjustin.kairos.auth.repository.RefreshSessionRepository
 import io.github.drawjustin.kairos.common.error.KairosErrorCode
 import io.github.drawjustin.kairos.common.error.KairosException
 import io.github.drawjustin.kairos.user.entity.User
+import io.github.drawjustin.kairos.user.entity.UserRole
 import io.github.drawjustin.kairos.user.repository.UserRepository
 import io.github.drawjustin.kairos.util.Jwt
 import io.jsonwebtoken.JwtException
@@ -38,6 +39,7 @@ class AuthService(
         val newUser = User(
             email = normalizedEmail,
             password = passwordEncoder.encode(request.password),
+            role = UserRole.USER,
         )
         val user: User = userRepository.save(newUser)
 
