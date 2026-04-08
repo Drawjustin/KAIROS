@@ -13,6 +13,7 @@ import io.github.drawjustin.kairos.auth.dto.RegisterRequest
 import io.github.drawjustin.kairos.common.api.BaseOutput
 import io.github.drawjustin.kairos.common.error.KairosErrorCode
 import io.github.drawjustin.kairos.auth.repository.RefreshSessionRepository
+import java.time.Instant
 import io.github.drawjustin.kairos.user.entity.UserRole
 import io.github.drawjustin.kairos.user.repository.UserRepository
 import org.assertj.core.api.Assertions.assertThat
@@ -193,6 +194,86 @@ class AuthIntegrationTests : IntegrationTestSupport() {
             }
     }
 
+    @Test
+    fun `login rejects a soft deleted user`() {
+        register(
+            RegisterRequest(
+                email = "deleted-user@example.com",
+                password = "password123",
+            ),
+        )
+
+        val user = userRepository.findByEmailAndDeletedAtIsNull("deleted-user@example.com").orElseThrow()
+        userRepository.delete(user)
+
+        mockMvc.perform(
+            post("/api/auth/login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    objectMapper.writeValueAsBytes(
+                        LoginRequest(
+                            email = "deleted-user@example.com",
+                            password = "password123",
+                        ),
+                    ),
+                ),
+        )
+            .assertUnauthorized(KairosErrorCode.INVALID_CREDENTIALS.message)
+    }
+
+    @Test
+    fun `register allows reusing an email after soft delete`() {
+        register(
+            RegisterRequest(
+                email = "rejoin@example.com",
+                password = "password123",
+            ),
+        )
+
+        val deletedUser = userRepository.findByEmailAndDeletedAtIsNull("rejoin@example.com").orElseThrow()
+        userRepository.delete(deletedUser)
+
+        val response = register(
+            RegisterRequest(
+                email = "rejoin@example.com",
+                password = "password123",
+            ),
+        )
+
+        assertThat(response.accessToken).isNotBlank()
+        assertThat(userRepository.findByEmailAndDeletedAtIsNull("rejoin@example.com")).isPresent
+    }
+
+    @Test
+    fun `refresh rejects a soft deleted session`() {
+        register(
+            RegisterRequest(
+                email = "deleted-session@example.com",
+                password = "password123",
+            ),
+        )
+
+        val loginResponse = login(
+            LoginRequest(
+                email = "deleted-session@example.com",
+                password = "password123",
+            ),
+        )
+
+        val session = refreshSessionRepository
+            .findBySessionIdAndDeletedAtIsNullAndUser_DeletedAtIsNull(loginResponse.sessionId)
+            ?: error("Expected refresh session to exist")
+        session.deletedAt = Instant.now()
+        refreshSessionRepository.save(session)
+
+        mockMvc.perform(
+            post("/api/auth/refresh")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsBytes(RefreshRequest(loginResponse.refreshToken))),
+        )
+            .assertUnauthorized(KairosErrorCode.REFRESH_SESSION_NOT_FOUND.message)
+    }
+
     private fun register(request: RegisterRequest): AuthOutput {
         // 테스트 본문에서는 핵심 시나리오만 보이도록 HTTP 호출 세부는 헬퍼로 감싼다.
         val result = mockMvc.perform(
@@ -239,6 +320,7 @@ class AuthIntegrationTests : IntegrationTestSupport() {
                 val response = objectMapper.readValue(result.response.contentAsByteArray, BaseOutput::class.java)
                 assertThat(response.errorMessage).isEqualTo(expectedMessage)
                 assertThat(response.errorCode).isNotBlank()
+                assertThat(result.response.getHeader("X-Trace-Id")).isNotBlank()
             }
     }
 }
