@@ -12,9 +12,13 @@ import jakarta.persistence.JoinColumn
 import jakarta.persistence.ManyToOne
 import jakarta.persistence.Table
 import java.time.Instant
+import org.hibernate.annotations.SQLDelete
+import org.hibernate.annotations.SQLRestriction
 
 @Entity
 @Table(name = "refresh_sessions")
+@SQLDelete(sql = "update refresh_sessions set deleted_at = current_timestamp, updated_at = current_timestamp where id = ? and deleted_at is null")
+@SQLRestriction("deleted_at is null")
 // 각 refresh token의 서버 측 상태를 관리하는 엔티티다.
 class RefreshSession(
     @Id

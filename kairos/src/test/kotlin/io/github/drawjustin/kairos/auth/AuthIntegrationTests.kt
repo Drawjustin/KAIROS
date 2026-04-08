@@ -50,8 +50,8 @@ class AuthIntegrationTests : IntegrationTestSupport() {
     @BeforeEach
     fun setUp() {
         // 테스트 간 데이터 누수를 막기 위해 매번 초기화한다.
-        refreshSessionRepository.deleteAll()
-        userRepository.deleteAll()
+        refreshSessionRepository.deleteAllInBatch()
+        userRepository.deleteAllInBatch()
     }
 
     @Test
@@ -66,8 +66,8 @@ class AuthIntegrationTests : IntegrationTestSupport() {
         assertThat(response.accessToken).isNotBlank()
         assertThat(response.refreshToken).isNotBlank()
         assertThat(response.tokenType).isEqualTo("Bearer")
-        assertThat(userRepository.findByEmail("tester@example.com")).isPresent
-        assertThat(refreshSessionRepository.findBySessionId(response.sessionId)).isNotNull
+        assertThat(userRepository.findByEmailAndDeletedAtIsNull("tester@example.com")).isPresent
+        assertThat(refreshSessionRepository.findBySessionIdAndDeletedAtIsNullAndUser_DeletedAtIsNull(response.sessionId)).isNotNull
     }
 
     @Test

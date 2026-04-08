@@ -9,16 +9,20 @@ import jakarta.persistence.GeneratedValue
 import jakarta.persistence.GenerationType
 import jakarta.persistence.Id
 import jakarta.persistence.Table
+import org.hibernate.annotations.SQLDelete
+import org.hibernate.annotations.SQLRestriction
 
 @Entity
 @Table(name = "users")
+@SQLDelete(sql = "update users set deleted_at = current_timestamp, updated_at = current_timestamp where id = ? and deleted_at is null")
+@SQLRestriction("deleted_at is null")
 // 현재는 인증의 주체 역할을 하는 가장 단순한 사용자 엔티티다.
 class User(
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     val id: Long? = null,
 
-    @Column(nullable = false, unique = true)
+    @Column(nullable = false)
     // 로그인 식별자로 쓰이므로 유니크 제약을 둔다.
     var email: String,
 

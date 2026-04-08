@@ -32,7 +32,7 @@ class AuthService(
     fun register(request: RegisterRequest, metadata: SessionMetadata): AuthResponse {
         // 이메일은 비교 일관성을 위해 저장 전에 정규화한다.
         val normalizedEmail = request.email.trim().lowercase()
-        if (userRepository.existsByEmail(normalizedEmail)) {
+        if (userRepository.existsByEmailAndDeletedAtIsNull(normalizedEmail)) {
             throw KairosException(KairosErrorCode.EMAIL_ALREADY_IN_USE)
         }
 
@@ -49,7 +49,7 @@ class AuthService(
 
     @Transactional
     fun login(request: LoginRequest, metadata: SessionMetadata): AuthResponse {
-        val user = userRepository.findByEmail(request.email.trim().lowercase())
+        val user = userRepository.findByEmailAndDeletedAtIsNull(request.email.trim().lowercase())
             .orElseThrow { KairosException(KairosErrorCode.INVALID_CREDENTIALS) }
 
         // 비밀번호가 틀리면 토큰 발급 없이 바로 종료한다.
@@ -77,7 +77,7 @@ class AuthService(
         }
 
         val sessionId = jwt.sessionId(claims)
-        val session = refreshSessionRepository.findBySessionId(sessionId)
+        val session = refreshSessionRepository.findBySessionIdAndDeletedAtIsNullAndUser_DeletedAtIsNull(sessionId)
             ?: throw KairosException(KairosErrorCode.REFRESH_SESSION_NOT_FOUND)
 
         val sessionUserId = requireNotNull(session.user.id) { "Refresh session user id must exist" }
@@ -121,7 +121,7 @@ class AuthService(
             return
         }
 
-        val session = refreshSessionRepository.findBySessionId(jwt.sessionId(claims)) ?: return
+        val session = refreshSessionRepository.findBySessionIdAndDeletedAtIsNullAndUser_DeletedAtIsNull(jwt.sessionId(claims)) ?: return
         if (session.tokenHash == tokenHasher.hash(refreshToken) && session.revokedAt == null) {
             session.revoke()
             refreshSessionRepository.save(session)
@@ -131,7 +131,7 @@ class AuthService(
     @Transactional(readOnly = true)
     fun findUser(userId: Long): User {
         // /me 같은 인증 후 조회에서 공통으로 사용한다.
-        return userRepository.findById(userId)
+        return userRepository.findByIdAndDeletedAtIsNull(userId)
             .orElseThrow { KairosException(KairosErrorCode.USER_NOT_FOUND) }
     }
 
@@ -167,7 +167,7 @@ class AuthService(
     private fun revokeAllActiveSessions(userId: Long) {
         val now = Instant.now()
         // 재사용 탐지 시점에는 남아 있는 활성 세션을 모두 폐기한다.
-        refreshSessionRepository.findAllByUser_IdAndRevokedAtIsNull(userId)
+        refreshSessionRepository.findAllByUser_IdAndUser_DeletedAtIsNullAndRevokedAtIsNullAndDeletedAtIsNull(userId)
             .forEach {
                 it.revoke(now)
                 refreshSessionRepository.save(it)
