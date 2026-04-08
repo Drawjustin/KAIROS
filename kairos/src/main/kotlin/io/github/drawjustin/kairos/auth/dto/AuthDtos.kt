@@ -49,17 +49,10 @@ data class AuthOutput(
     val sessionId: String,
 )
 
-// auth 최종 응답은 공통 메타를 상속하고 실제 데이터는 result에 담는다.
+// auth 최종 응답은 result만 노출하고 에러 메타는 BaseOutput 기본값에 맡긴다.
 data class AuthResponse(
     val result: AuthOutput,
-    override val errorCode: String? = null,
-    override val errorMessage: String? = null,
-    override val slackError: Boolean? = null,
-) : BaseOutput(
-    errorCode = errorCode,
-    errorMessage = errorMessage,
-    slackError = slackError,
-)
+) : BaseOutput()
 
 // /me에서 result 안에 담길 현재 사용자 정보다.
 data class MeOutput(
@@ -68,17 +61,10 @@ data class MeOutput(
     val role: String,
 )
 
-// /me 최종 응답은 공통 메타를 상속하고 사용자 정보는 result에 담는다.
+// /me 최종 응답도 성공 시에는 사용자 정보만 result에 담아 내려준다.
 data class MeResponse(
     val result: MeOutput,
-    override val errorCode: String? = null,
-    override val errorMessage: String? = null,
-    override val slackError: Boolean? = null,
-) : BaseOutput(
-    errorCode = errorCode,
-    errorMessage = errorMessage,
-    slackError = slackError,
-)
+) : BaseOutput()
 
 // 로그아웃에서 result 안에 담길 최소 성공 정보다.
 data class LogoutOutput(
@@ -88,11 +74,4 @@ data class LogoutOutput(
 // 로그아웃도 같은 응답 규격을 유지하면서 최소 성공 정보만 result에 담는다.
 data class LogoutResponse(
     val result: LogoutOutput = LogoutOutput(),
-    override val errorCode: String? = null,
-    override val errorMessage: String? = null,
-    override val slackError: Boolean? = null,
-) : BaseOutput(
-    errorCode = errorCode,
-    errorMessage = errorMessage,
-    slackError = slackError,
-)
+) : BaseOutput()

@@ -26,7 +26,6 @@ class GlobalExceptionHandler(
             BaseOutput(
                 errorCode = error.code,
                 errorMessage = exception.message,
-                slackError = error.slackError,
             ),
         )
     }
@@ -53,7 +52,6 @@ class GlobalExceptionHandler(
             BaseOutput(
                 errorCode = error.code,
                 errorMessage = message,
-                slackError = error.slackError,
             ),
         )
     }
@@ -70,7 +68,6 @@ class GlobalExceptionHandler(
             BaseOutput(
                 errorCode = error.code,
                 errorMessage = exception.message ?: error.message,
-                slackError = error.slackError,
             ),
         )
     }
@@ -87,7 +84,6 @@ class GlobalExceptionHandler(
             BaseOutput(
                 errorCode = error.code,
                 errorMessage = error.message,
-                slackError = error.slackError,
             ),
         )
     }
