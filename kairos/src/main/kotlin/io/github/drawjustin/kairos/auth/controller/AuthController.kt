@@ -5,7 +5,6 @@ import io.github.drawjustin.kairos.auth.dto.AuthResponse
 import io.github.drawjustin.kairos.auth.dto.LoginRequest
 import io.github.drawjustin.kairos.auth.dto.LogoutResponse
 import io.github.drawjustin.kairos.auth.dto.LogoutRequest
-import io.github.drawjustin.kairos.auth.dto.MeOutput
 import io.github.drawjustin.kairos.auth.dto.MeResponse
 import io.github.drawjustin.kairos.auth.dto.RefreshRequest
 import io.github.drawjustin.kairos.auth.dto.RegisterRequest
@@ -63,17 +62,8 @@ class AuthController(
 
     @GetMapping("/me")
     // SecurityContext에 들어간 principal을 기준으로 현재 사용자 정보를 돌려준다.
-    fun me(@AuthenticationPrincipal principal: AuthenticatedUser): MeResponse {
-        val user = authService.findUser(principal.id)
-        val userId = requireNotNull(user.id) { "Authenticated user id must exist" }
-        return MeResponse(
-            result = MeOutput(
-                id = userId,
-                email = user.email,
-                role = user.role,
-            ),
-        )
-    }
+    fun me(@AuthenticationPrincipal principal: AuthenticatedUser): MeResponse =
+        MeResponse(result = authService.findMe(principal.id))
 
     // 세션 추적과 이상 탐지에 쓸 최소한의 디바이스 정보를 요청에서 추출한다.
     private fun HttpServletRequest.toMetadata(platform: String?, device: String?) = SessionMetadata(

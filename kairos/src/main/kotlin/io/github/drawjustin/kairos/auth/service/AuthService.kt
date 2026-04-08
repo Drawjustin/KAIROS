@@ -5,6 +5,7 @@ import io.github.drawjustin.kairos.auth.domain.SessionMetadata
 import io.github.drawjustin.kairos.auth.dto.AuthOutput
 import io.github.drawjustin.kairos.auth.dto.AuthResponse
 import io.github.drawjustin.kairos.auth.dto.LoginRequest
+import io.github.drawjustin.kairos.auth.dto.MeOutput
 import io.github.drawjustin.kairos.auth.dto.RegisterRequest
 import io.github.drawjustin.kairos.auth.repository.RefreshSessionRepository
 import io.github.drawjustin.kairos.common.error.KairosErrorCode
@@ -129,10 +130,17 @@ class AuthService(
     }
 
     @Transactional(readOnly = true)
-    fun findUser(userId: Long): User {
-        // /me 같은 인증 후 조회에서 공통으로 사용한다.
-        return userRepository.findByIdAndDeletedAtIsNull(userId)
+    fun findMe(userId: Long): MeOutput {
+        // open-in-view를 끈 뒤에는 컨트롤러가 엔티티를 만지지 않도록 DTO로 바로 바꿔서 반환한다.
+        val user = userRepository.findByIdAndDeletedAtIsNull(userId)
             .orElseThrow { KairosException(KairosErrorCode.USER_NOT_FOUND) }
+
+        val resolvedUserId = requireNotNull(user.id) { "Authenticated user id must exist" }
+        return MeOutput(
+            id = resolvedUserId,
+            email = user.email,
+            role = user.role,
+        )
     }
 
     private fun createSession(user: User, metadata: SessionMetadata): AuthResponse {
