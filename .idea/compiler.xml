@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="CompilerConfiguration">
+    <bytecodeTargetLevel>
+      <module name="kairos" target="21" />
+      <module name="kairos.main" target="21" />
+      <module name="kairos.test" target="21" />
+    </bytecodeTargetLevel>
+  </component>
+  <component name="JavacSettings">
+    <option name="ADDITIONAL_OPTIONS_OVERRIDE">
+      <module name="kairos" options="-parameters" />
+      <module name="kairos.main" options="-parameters" />
+      <module name="kairos.test" options="-parameters" />
+    </option>
+  </component>
+</project>
