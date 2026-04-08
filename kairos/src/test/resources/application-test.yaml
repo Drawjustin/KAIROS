@@ -24,3 +24,9 @@ kairos:
 # 테스트는 기본적으로 실제 Slack으로 알림을 보내지 않는다.
 slack:
   webhook-url: ${SLACK_WEBHOOK_URL:}
+
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
