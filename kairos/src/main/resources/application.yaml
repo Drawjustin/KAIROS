@@ -14,3 +14,8 @@ kairos:
     secret: ${KAIROS_JWT_SECRET}
     access-token-expiration: ${KAIROS_JWT_ACCESS_TOKEN_EXPIRATION:15m}
     refresh-token-expiration: ${KAIROS_JWT_REFRESH_TOKEN_EXPIRATION:30d}
+
+logging:
+  pattern:
+    # 모든 로그에서 요청 추적용 traceId를 바로 확인할 수 있게 MDC 값을 붙인다.
+    console: "%clr(%d{yyyy-MM-dd'T'HH:mm:ss.SSSXXX}){faint} %clr(%5p) [%X{traceId:-no-trace}] %clr(${PID:- }){magenta} --- [%15.15t] %clr(%-40.40logger{39}){cyan} : %m%n%wEx"

@@ -4,6 +4,8 @@ import io.github.drawjustin.kairos.common.api.BaseOutput
 import io.github.drawjustin.kairos.common.slack.SlackNotifier
 import jakarta.validation.ConstraintViolationException
 import jakarta.servlet.http.HttpServletRequest
+import org.slf4j.LoggerFactory
+import org.slf4j.MDC
 import org.springframework.http.ResponseEntity
 import org.springframework.validation.FieldError
 import org.springframework.web.bind.MethodArgumentNotValidException
@@ -15,6 +17,8 @@ import org.springframework.web.bind.annotation.RestControllerAdvice
 class GlobalExceptionHandler(
     private val slackNotifier: SlackNotifier,
 ) {
+    private val logger = LoggerFactory.getLogger(javaClass)
+
     @ExceptionHandler(KairosException::class)
     fun handleKairosException(
         exception: KairosException,
@@ -22,6 +26,7 @@ class GlobalExceptionHandler(
     ): ResponseEntity<BaseOutput> {
         val error = exception.errorCode
         notifySlackIfNeeded(error, exception, request)
+        logException(error, exception, request)
         return ResponseEntity.status(error.status).body(
             BaseOutput(
                 errorCode = error.code,
@@ -48,6 +53,7 @@ class GlobalExceptionHandler(
             .ifBlank { error.message }
 
         notifySlackIfNeeded(error, exception, request)
+        logException(error, exception, request, message = message)
         return ResponseEntity.status(error.status).body(
             BaseOutput(
                 errorCode = error.code,
@@ -64,6 +70,7 @@ class GlobalExceptionHandler(
     ): ResponseEntity<BaseOutput> {
         val error = KairosErrorCode.INVALID_INPUT
         notifySlackIfNeeded(error, exception, request)
+        logException(error, exception, request, message = exception.message ?: error.message)
         return ResponseEntity.status(error.status).body(
             BaseOutput(
                 errorCode = error.code,
@@ -80,6 +87,7 @@ class GlobalExceptionHandler(
     ): ResponseEntity<BaseOutput> {
         val error = KairosErrorCode.INTERNAL_SERVER_ERROR
         notifySlackIfNeeded(error, exception, request)
+        logException(error, exception, request)
         return ResponseEntity.status(error.status).body(
             BaseOutput(
                 errorCode = error.code,
@@ -97,4 +105,36 @@ class GlobalExceptionHandler(
             slackNotifier.notifyError(error, exception, request)
         }
     }
+
+    private fun logException(
+        error: KairosErrorCode,
+        exception: Exception,
+        request: HttpServletRequest,
+        message: String? = exception.message,
+    ) {
+        val traceId = currentTraceId()
+        if (error.slackError || error.status.is5xxServerError) {
+            logger.error(
+                "Handled exception code={} method={} path={} traceId={} message={}",
+                error.code,
+                request.method,
+                request.requestURI,
+                traceId,
+                message,
+                exception,
+            )
+            return
+        }
+
+        logger.warn(
+            "Handled exception code={} method={} path={} traceId={} message={}",
+            error.code,
+            request.method,
+            request.requestURI,
+            traceId,
+            message,
+        )
+    }
+
+    private fun currentTraceId(): String? = MDC.get("traceId")
 }

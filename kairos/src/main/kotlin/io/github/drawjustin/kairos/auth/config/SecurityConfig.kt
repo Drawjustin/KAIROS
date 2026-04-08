@@ -1,6 +1,7 @@
 package io.github.drawjustin.kairos.auth.config
 
 import io.github.drawjustin.kairos.auth.security.JwtAuthenticationFilter
+import io.github.drawjustin.kairos.common.logging.TraceLoggingFilter
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.security.config.annotation.web.builders.HttpSecurity
@@ -15,6 +16,7 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 @EnableWebSecurity
 class SecurityConfig(
     private val jwtAuthenticationFilter: JwtAuthenticationFilter,
+    private val traceLoggingFilter: TraceLoggingFilter,
 ) {
     @Bean
     fun securityFilterChain(http: HttpSecurity): SecurityFilterChain {
@@ -35,8 +37,10 @@ class SecurityConfig(
                     .requestMatchers("/error").permitAll()
                     .anyRequest().authenticated()
             }
+            // 가장 앞단에서 traceId와 요청 로그를 남겨 이후 로그/에러/슬랙을 연결한다.
+            .addFilterBefore(traceLoggingFilter, UsernamePasswordAuthenticationFilter::class.java)
             // username/password 필터보다 먼저 JWT를 읽어 SecurityContext를 채운다.
-            .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter::class.java)
+            .addFilterAfter(jwtAuthenticationFilter, TraceLoggingFilter::class.java)
             .build()
     }
 
