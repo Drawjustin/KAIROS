@@ -16,3 +16,9 @@ spring:
 
 slack:
   webhook-url: ${SLACK_WEBHOOK_URL:}
+
+springdoc:
+  api-docs:
+    enabled: true
+  swagger-ui:
+    enabled: true
