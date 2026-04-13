@@ -100,7 +100,9 @@ class PlatformManagementService(
         request: CreateTenantUserRequest,
     ): TenantUserOutput {
         // 멤버 초대와 역할 부여는 tenant OWNER 또는 플랫폼 ADMIN만 처리하게 둔다.
-        val tenant = resolveTenantForRole(principal, tenantId, ownerRoles())
+        val tenant = tenantRepository.findByIdAndDeletedAtIsNull(tenantId)
+            .orElseThrow { KairosException(KairosErrorCode.TENANT_NOT_FOUND) }
+        requireTenantOwner(principal, tenantId)
         val user = userRepository.findByEmailAndDeletedAtIsNull(request.email.trim())
             .orElseThrow { KairosException(KairosErrorCode.USER_NOT_FOUND) }
         if (tenantUserRepository.existsByTenant_IdAndUser_IdAndDeletedAtIsNull(tenantId, requireNotNull(user.id))) {

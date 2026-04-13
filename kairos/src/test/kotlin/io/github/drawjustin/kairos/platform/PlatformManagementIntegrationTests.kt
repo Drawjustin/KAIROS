@@ -7,6 +7,7 @@ import io.github.drawjustin.kairos.auth.dto.AuthOutput
 import io.github.drawjustin.kairos.auth.dto.AuthResponse
 import io.github.drawjustin.kairos.auth.dto.LoginRequest
 import io.github.drawjustin.kairos.auth.dto.RegisterRequest
+import io.github.drawjustin.kairos.auth.repository.RefreshSessionRepository
 import io.github.drawjustin.kairos.common.api.BaseOutput
 import io.github.drawjustin.kairos.platform.dto.ApiKeyIssueResponse
 import io.github.drawjustin.kairos.platform.dto.ApiKeysResponse
@@ -36,6 +37,7 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.http.HttpHeaders
 import org.springframework.http.MediaType
+import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.test.context.ActiveProfiles
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete
@@ -70,14 +72,18 @@ class PlatformManagementIntegrationTests : IntegrationTestSupport() {
     @Autowired
     lateinit var apiKeyRepository: ApiKeyRepository
 
+    @Autowired
+    lateinit var refreshSessionRepository: RefreshSessionRepository
+
+    @Autowired
+    lateinit var jdbcTemplate: JdbcTemplate
+
     @BeforeEach
     fun setUp() {
-        // FK 순서를 따라 자식 리소스부터 지워 이전 테스트 데이터 간섭을 막는다.
-        apiKeyRepository.deleteAllInBatch()
-        projectRepository.deleteAllInBatch()
-        tenantUserRepository.deleteAllInBatch()
-        tenantRepository.deleteAllInBatch()
-        userRepository.deleteAllInBatch()
+        // soft delete된 row까지 포함해 완전히 비워야 다음 테스트의 FK와 unique 제약이 흔들리지 않는다.
+        jdbcTemplate.execute(
+            "truncate table api_key, project, tenant_user, tenant, refresh_session, users restart identity cascade",
+        )
     }
 
     @Test
