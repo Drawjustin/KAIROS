@@ -9,7 +9,5 @@ interface TenantRepository : JpaRepository<Tenant, Long> {
 
     fun findAllByDeletedAtIsNullOrderByCreatedAtAsc(): List<Tenant>
 
-    fun findAllByOwnerUser_IdAndDeletedAtIsNullOrderByCreatedAtAsc(ownerUserId: Long): List<Tenant>
-
     fun findByIdAndDeletedAtIsNull(id: Long): Optional<Tenant>
 }

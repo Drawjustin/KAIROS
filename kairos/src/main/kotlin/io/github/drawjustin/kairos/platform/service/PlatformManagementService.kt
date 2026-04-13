@@ -16,7 +16,10 @@ import io.github.drawjustin.kairos.platform.dto.TenantOutput
 import io.github.drawjustin.kairos.project.entity.Project
 import io.github.drawjustin.kairos.project.repository.ProjectRepository
 import io.github.drawjustin.kairos.tenant.entity.Tenant
+import io.github.drawjustin.kairos.tenant.entity.TenantUser
+import io.github.drawjustin.kairos.tenant.entity.TenantUserRole
 import io.github.drawjustin.kairos.tenant.repository.TenantRepository
+import io.github.drawjustin.kairos.tenant.repository.TenantUserRepository
 import io.github.drawjustin.kairos.user.entity.User
 import io.github.drawjustin.kairos.user.entity.UserRole
 import io.github.drawjustin.kairos.user.repository.UserRepository
@@ -29,6 +32,7 @@ import org.springframework.transaction.annotation.Transactional
 // tenant, project, API key의 최소 관리 흐름을 한곳에서 묶는다.
 class PlatformManagementService(
     private val tenantRepository: TenantRepository,
+    private val tenantUserRepository: TenantUserRepository,
     private val projectRepository: ProjectRepository,
     private val apiKeyRepository: ApiKeyRepository,
     private val userRepository: UserRepository,
@@ -49,11 +53,18 @@ class PlatformManagementService(
             throw KairosException(KairosErrorCode.TENANT_ALREADY_EXISTS)
         }
 
-        val owner = principal.toActiveUser()
+        val creator = principal.toActiveUser()
         val tenant = tenantRepository.save(
             Tenant(
-                ownerUser = owner,
                 name = name,
+            ),
+        )
+        // tenant를 만든 사용자에게 첫 OWNER 역할을 부여해 이후 관리 권한을 연결한다.
+        tenantUserRepository.save(
+            TenantUser(
+                tenant = tenant,
+                user = creator,
+                role = TenantUserRole.OWNER,
             ),
         )
 
@@ -62,7 +73,7 @@ class PlatformManagementService(
 
     @Transactional(readOnly = true)
     fun listTenants(principal: AuthenticatedUser): List<TenantOutput> {
-        // tenant 목록 조회는 운영자 전용으로 두고, ADMIN이면 전체 tenant를 볼 수 있게 한다.
+        // tenant 전체 목록은 운영자 백오피스 용도로만 노출한다.
         if (principal.role != UserRole.ADMIN) {
             throw KairosException(KairosErrorCode.TENANT_ACCESS_DENIED)
         }
@@ -77,7 +88,7 @@ class PlatformManagementService(
         tenantId: Long,
         request: CreateProjectRequest,
     ): ProjectOutput {
-        // project 생성 전에는 tenant 소유권부터 확인해 다른 사용자의 공간에 못 쓰게 한다.
+        // project 생성 전에는 tenant membership 권한부터 확인해 다른 회사 영역을 건드리지 못하게 한다.
         val tenant = resolveOwnedTenant(principal, tenantId)
         val name = request.name.trim()
         if (projectRepository.existsByTenant_IdAndNameIgnoreCaseAndDeletedAtIsNull(tenantId, name)) {
@@ -144,22 +155,33 @@ class PlatformManagementService(
     }
 
     private fun resolveOwnedTenant(principal: AuthenticatedUser, tenantId: Long): Tenant {
-        // 현재는 owner 또는 ADMIN만 tenant를 볼 수 있게 단순한 접근 규칙을 둔다.
+        // tenant 권한은 tenant_user의 OWNER/ADMIN 역할 또는 플랫폼 ADMIN 여부로 판정한다.
         val tenant = tenantRepository.findByIdAndDeletedAtIsNull(tenantId)
             .orElseThrow { KairosException(KairosErrorCode.TENANT_NOT_FOUND) }
-        val ownerUserId = requireNotNull(tenant.ownerUser.id) { "Tenant owner id must exist" }
-        if (principal.role != io.github.drawjustin.kairos.user.entity.UserRole.ADMIN && ownerUserId != principal.id) {
+        if (principal.role != UserRole.ADMIN &&
+            !tenantUserRepository.existsByTenant_IdAndUser_IdAndRoleInAndDeletedAtIsNull(
+                tenantId = tenantId,
+                userId = principal.id,
+                roles = listOf(TenantUserRole.OWNER, TenantUserRole.ADMIN),
+            )
+        ) {
             throw KairosException(KairosErrorCode.TENANT_ACCESS_DENIED)
         }
         return tenant
     }
 
     private fun resolveOwnedProject(principal: AuthenticatedUser, projectId: Long): Project {
-        // project 권한은 상위 tenant owner 기준으로 판정해 정책을 한곳에 모은다.
+        // project 권한도 상위 tenant의 membership 역할을 그대로 따른다.
         val project = projectRepository.findByIdAndDeletedAtIsNull(projectId)
             .orElseThrow { KairosException(KairosErrorCode.PROJECT_NOT_FOUND) }
-        val ownerUserId = requireNotNull(project.tenant.ownerUser.id) { "Tenant owner id must exist" }
-        if (principal.role != io.github.drawjustin.kairos.user.entity.UserRole.ADMIN && ownerUserId != principal.id) {
+        val tenantId = requireNotNull(project.tenant.id) { "Project tenant id must exist" }
+        if (principal.role != UserRole.ADMIN &&
+            !tenantUserRepository.existsByTenant_IdAndUser_IdAndRoleInAndDeletedAtIsNull(
+                tenantId = tenantId,
+                userId = principal.id,
+                roles = listOf(TenantUserRole.OWNER, TenantUserRole.ADMIN),
+            )
+        ) {
             throw KairosException(KairosErrorCode.PROJECT_ACCESS_DENIED)
         }
         return project
@@ -174,7 +196,6 @@ class PlatformManagementService(
         id = requireNotNull(id) { "Tenant id must exist" },
         name = name,
         status = status,
-        ownerUserId = requireNotNull(ownerUser.id) { "Tenant owner id must exist" },
         createdAt = requireNotNull(createdAt) { "Tenant createdAt must exist" },
     )
 

@@ -36,7 +36,7 @@ class PlatformController(
     private val platformManagementService: PlatformManagementService,
 ) {
     @PostMapping("/tenants/{tenantId}/projects")
-    @Operation(summary = "project 생성", description = "지정한 tenant 아래에 새 project를 생성한다. tenant owner 또는 ADMIN만 가능하다.")
+    @Operation(summary = "project 생성", description = "지정한 tenant 아래에 새 project를 생성한다. 해당 tenant의 OWNER/ADMIN 역할 사용자 또는 플랫폼 ADMIN만 가능하다.")
     @SecurityRequirement(name = "bearerAuth")
     @ApiResponses(
         value = [
@@ -93,7 +93,7 @@ class PlatformController(
     )
 
     @GetMapping("/tenants/{tenantId}/projects")
-    @Operation(summary = "tenant의 project 목록 조회", description = "지정한 tenant 아래의 project 목록을 조회한다. tenant owner 또는 ADMIN만 가능하다.")
+    @Operation(summary = "tenant의 project 목록 조회", description = "지정한 tenant 아래의 project 목록을 조회한다. 해당 tenant의 OWNER/ADMIN 역할 사용자 또는 플랫폼 ADMIN만 가능하다.")
     @SecurityRequirement(name = "bearerAuth")
     @ApiResponses(
         value = [
@@ -114,7 +114,7 @@ class PlatformController(
             ),
         ],
     )
-    // 목록 조회도 같은 tenant 경로를 써서 소유권 검사를 재사용한다.
+    // 목록 조회도 같은 tenant 경로를 써서 membership 권한 검사를 재사용한다.
     fun listProjects(
         @AuthenticationPrincipal principal: AuthenticatedUser,
         @Parameter(description = "project 목록을 조회할 tenant ID", example = "1")

@@ -1,6 +1,5 @@
 create table if not exists tenant (
     id bigserial primary key,
-    owner_user_id bigint not null references users(id),
     name varchar(120) not null,
     status varchar(50) not null default 'ACTIVE',
     created_at timestamp with time zone not null default current_timestamp,
@@ -12,11 +11,31 @@ create unique index if not exists ux_tenant_name_active
     on tenant(lower(name))
     where deleted_at is null;
 
-create index if not exists idx_tenant_owner_user_id
-    on tenant(owner_user_id);
-
 create index if not exists idx_tenant_deleted_at
     on tenant(deleted_at);
+
+create table if not exists tenant_user (
+    id bigserial primary key,
+    tenant_id bigint not null references tenant(id),
+    user_id bigint not null references users(id),
+    role varchar(50) not null,
+    created_at timestamp with time zone not null default current_timestamp,
+    updated_at timestamp with time zone not null default current_timestamp,
+    deleted_at timestamp with time zone null
+);
+
+create unique index if not exists ux_tenant_user_active
+    on tenant_user(tenant_id, user_id)
+    where deleted_at is null;
+
+create index if not exists idx_tenant_user_tenant_id
+    on tenant_user(tenant_id);
+
+create index if not exists idx_tenant_user_user_id
+    on tenant_user(user_id);
+
+create index if not exists idx_tenant_user_deleted_at
+    on tenant_user(deleted_at);
 
 create table if not exists project (
     id bigserial primary key,

@@ -67,7 +67,7 @@ class PlatformAdminController(
             ),
         ],
     )
-    // tenant 생성은 운영자가 회사/조직 단위를 등록하는 진입점이다.
+    // tenant 생성은 운영자가 고객사/조직 단위를 등록하는 진입점이다.
     fun createTenant(
         @AuthenticationPrincipal principal: AuthenticatedUser,
         @Valid @RequestBody request: CreateTenantRequest,

@@ -23,8 +23,6 @@ data class TenantOutput(
     val name: String,
     @field:Schema(description = "tenant 상태", example = "ACTIVE")
     val status: TenantStatus,
-    @field:Schema(description = "owner 사용자 ID", example = "1")
-    val ownerUserId: Long,
     @field:Schema(description = "생성 시각", example = "2026-04-13T10:00:00Z")
     val createdAt: Instant,
 )

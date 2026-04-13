@@ -20,6 +20,7 @@ import io.github.drawjustin.kairos.platform.dto.TenantsResponse
 import io.github.drawjustin.kairos.project.entity.ProjectEnvironment
 import io.github.drawjustin.kairos.project.repository.ProjectRepository
 import io.github.drawjustin.kairos.tenant.repository.TenantRepository
+import io.github.drawjustin.kairos.tenant.repository.TenantUserRepository
 import io.github.drawjustin.kairos.user.entity.UserRole
 import io.github.drawjustin.kairos.user.repository.UserRepository
 import org.assertj.core.api.Assertions.assertThat
@@ -39,7 +40,7 @@ import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 @SpringBootTest
 @ActiveProfiles("test")
 @AutoConfigureMockMvc
-// tenant -> project -> API key 생성 흐름과 소유권 검증을 함께 확인한다.
+// tenant -> project -> API key 생성 흐름과 tenant membership 권한 검증을 함께 확인한다.
 class PlatformManagementIntegrationTests : IntegrationTestSupport() {
     @Autowired
     lateinit var mockMvc: MockMvc
@@ -54,6 +55,9 @@ class PlatformManagementIntegrationTests : IntegrationTestSupport() {
     lateinit var tenantRepository: TenantRepository
 
     @Autowired
+    lateinit var tenantUserRepository: TenantUserRepository
+
+    @Autowired
     lateinit var projectRepository: ProjectRepository
 
     @Autowired
@@ -64,6 +68,7 @@ class PlatformManagementIntegrationTests : IntegrationTestSupport() {
         // FK 순서를 따라 자식 리소스부터 지워 이전 테스트 데이터 간섭을 막는다.
         apiKeyRepository.deleteAllInBatch()
         projectRepository.deleteAllInBatch()
+        tenantUserRepository.deleteAllInBatch()
         tenantRepository.deleteAllInBatch()
         userRepository.deleteAllInBatch()
     }
@@ -72,17 +77,17 @@ class PlatformManagementIntegrationTests : IntegrationTestSupport() {
     fun `admin can create tenant project and api key`() {
         register(
             RegisterRequest(
-                email = "owner@example.com",
+                email = "admin@example.com",
                 password = "password123",
             ),
         )
-        val ownerUser = userRepository.findByEmailAndDeletedAtIsNull("owner@example.com").orElseThrow()
-        ownerUser.role = UserRole.ADMIN
-        userRepository.save(ownerUser)
+        val adminUser = userRepository.findByEmailAndDeletedAtIsNull("admin@example.com").orElseThrow()
+        adminUser.role = UserRole.ADMIN
+        userRepository.save(adminUser)
 
         val loginResponse = login(
             LoginRequest(
-                email = "owner@example.com",
+                email = "admin@example.com",
                 password = "password123",
             ),
         )
@@ -92,16 +97,16 @@ class PlatformManagementIntegrationTests : IntegrationTestSupport() {
 
         register(
             RegisterRequest(
-                email = "owner3@example.com",
+                email = "admin2@example.com",
                 password = "password123",
             ),
         )
-        val anotherAdmin = userRepository.findByEmailAndDeletedAtIsNull("owner3@example.com").orElseThrow()
+        val anotherAdmin = userRepository.findByEmailAndDeletedAtIsNull("admin2@example.com").orElseThrow()
         anotherAdmin.role = UserRole.ADMIN
         userRepository.save(anotherAdmin)
         val anotherAdminLogin = login(
             LoginRequest(
-                email = "owner3@example.com",
+                email = "admin2@example.com",
                 password = "password123",
             ),
         )
@@ -202,26 +207,26 @@ class PlatformManagementIntegrationTests : IntegrationTestSupport() {
     }
 
     @Test
-    fun `non owner cannot manage another tenants resources`() {
+    fun `non member cannot manage another tenants resources`() {
         register(
             RegisterRequest(
-                email = "owner2@example.com",
+                email = "tenant-admin@example.com",
                 password = "password123",
             ),
         )
-        val ownerUser = userRepository.findByEmailAndDeletedAtIsNull("owner2@example.com").orElseThrow()
-        ownerUser.role = UserRole.ADMIN
-        userRepository.save(ownerUser)
+        val tenantAdminUser = userRepository.findByEmailAndDeletedAtIsNull("tenant-admin@example.com").orElseThrow()
+        tenantAdminUser.role = UserRole.ADMIN
+        userRepository.save(tenantAdminUser)
 
-        val ownerLogin = login(
+        val tenantAdminLogin = login(
             LoginRequest(
-                email = "owner2@example.com",
+                email = "tenant-admin@example.com",
                 password = "password123",
             ),
         )
-        val tenant = createTenant(ownerLogin.accessToken, CreateTenantRequest(name = "search-team-2"))
+        val tenant = createTenant(tenantAdminLogin.accessToken, CreateTenantRequest(name = "search-team-2"))
         val project = createProject(
-            ownerLogin.accessToken,
+            tenantAdminLogin.accessToken,
             tenant.id,
             CreateProjectRequest(name = "secret-prod"),
         )
@@ -245,7 +250,7 @@ class PlatformManagementIntegrationTests : IntegrationTestSupport() {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsBytes(CreateProjectRequest(name = "hijack"))),
         )
-            // tenant owner가 아니면 하위 project 생성도 막혀야 한다.
+            // tenant에 OWNER/ADMIN으로 속하지 않으면 하위 project 생성도 막혀야 한다.
             .andExpect(status().isForbidden)
             .andExpect { result ->
                 val response = objectMapper.readValue(result.response.contentAsByteArray, BaseOutput::class.java)
@@ -256,7 +261,7 @@ class PlatformManagementIntegrationTests : IntegrationTestSupport() {
             get("/api/platform/projects/${project.id}/api-keys")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer ${otherLogin.accessToken}"),
         )
-            // project 권한도 상위 tenant owner 기준으로 동일하게 제한한다.
+            // project 권한도 상위 tenant membership 기준으로 동일하게 제한한다.
             .andExpect(status().isForbidden)
             .andExpect { result ->
                 val response = objectMapper.readValue(result.response.contentAsByteArray, BaseOutput::class.java)
