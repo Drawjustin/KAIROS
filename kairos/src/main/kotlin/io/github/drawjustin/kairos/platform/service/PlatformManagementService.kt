@@ -61,9 +61,15 @@ class PlatformManagementService(
     }
 
     @Transactional(readOnly = true)
-    fun listTenants(principal: AuthenticatedUser): List<TenantOutput> =
-        tenantRepository.findAllByOwnerUser_IdAndDeletedAtIsNullOrderByCreatedAtAsc(principal.id)
+    fun listTenants(principal: AuthenticatedUser): List<TenantOutput> {
+        // tenant 목록 조회는 운영자 전용으로 두고, ADMIN이면 전체 tenant를 볼 수 있게 한다.
+        if (principal.role != UserRole.ADMIN) {
+            throw KairosException(KairosErrorCode.TENANT_ACCESS_DENIED)
+        }
+
+        return tenantRepository.findAllByDeletedAtIsNullOrderByCreatedAtAsc()
             .map { it.toOutput() }
+    }
 
     @Transactional
     fun createProject(

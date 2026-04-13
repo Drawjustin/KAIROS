@@ -90,16 +90,33 @@ class PlatformManagementIntegrationTests : IntegrationTestSupport() {
         val tenant = createTenant(loginResponse.accessToken, CreateTenantRequest(name = "search-team"))
         assertThat(tenant.name).isEqualTo("search-team")
 
+        register(
+            RegisterRequest(
+                email = "owner3@example.com",
+                password = "password123",
+            ),
+        )
+        val anotherAdmin = userRepository.findByEmailAndDeletedAtIsNull("owner3@example.com").orElseThrow()
+        anotherAdmin.role = UserRole.ADMIN
+        userRepository.save(anotherAdmin)
+        val anotherAdminLogin = login(
+            LoginRequest(
+                email = "owner3@example.com",
+                password = "password123",
+            ),
+        )
+        createTenant(anotherAdminLogin.accessToken, CreateTenantRequest(name = "chatbot-team"))
+
         val tenants = listTenants(loginResponse.accessToken)
-        assertThat(tenants).hasSize(1)
-        assertThat(tenants.first().id).isEqualTo(tenant.id)
+        assertThat(tenants).hasSize(2)
+        assertThat(tenants).extracting<String> { it.name }.containsExactly("search-team", "chatbot-team")
 
         val project = createProject(
             loginResponse.accessToken,
             tenant.id,
             CreateProjectRequest(
                 name = "chatbot-prod",
-                environment = ProjectEnvironment.PRODUCTION,
+                environment = ProjectEnvironment.OPER,
             ),
         )
         assertThat(project.tenantId).isEqualTo(tenant.id)
@@ -146,7 +163,7 @@ class PlatformManagementIntegrationTests : IntegrationTestSupport() {
         )
 
         mockMvc.perform(
-            post("/api/platform/tenants")
+            post("/api/admin/platform/tenants")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer ${loginResponse.accessToken}")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsBytes(CreateTenantRequest(name = "blocked-tenant"))),
@@ -155,6 +172,32 @@ class PlatformManagementIntegrationTests : IntegrationTestSupport() {
             .andExpect { result ->
                 val response = objectMapper.readValue(result.response.contentAsByteArray, BaseOutput::class.java)
                 assertThat(response.errorCode).isEqualTo("TENANT_000")
+            }
+    }
+
+    @Test
+    fun `non admin cannot list tenants`() {
+        register(
+            RegisterRequest(
+                email = "viewer@example.com",
+                password = "password123",
+            ),
+        )
+        val loginResponse = login(
+            LoginRequest(
+                email = "viewer@example.com",
+                password = "password123",
+            ),
+        )
+
+        mockMvc.perform(
+            get("/api/admin/platform/tenants")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer ${loginResponse.accessToken}"),
+        )
+            .andExpect(status().isForbidden)
+            .andExpect { result ->
+                val response = objectMapper.readValue(result.response.contentAsByteArray, BaseOutput::class.java)
+                assertThat(response.errorCode).isEqualTo("TENANT_003")
             }
     }
 
@@ -226,8 +269,8 @@ class PlatformManagementIntegrationTests : IntegrationTestSupport() {
             post("/api/auth/register")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsBytes(request)),
-        )
-            .andExpect(status().isOk)
+            )
+                .andExpect(status().isOk)
             .andReturn()
 
         return objectMapper.readValue(result.response.contentAsByteArray, AuthResponse::class.java).result
@@ -249,7 +292,7 @@ class PlatformManagementIntegrationTests : IntegrationTestSupport() {
         // 테스트 본문에서는 자원 생성 순서만 보이도록 HTTP 세부는 헬퍼에 모은다.
         objectMapper.readValue(
             mockMvc.perform(
-                post("/api/platform/tenants")
+                post("/api/admin/platform/tenants")
                     .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsBytes(request)),
@@ -263,7 +306,7 @@ class PlatformManagementIntegrationTests : IntegrationTestSupport() {
     private fun listTenants(accessToken: String) =
         objectMapper.readValue(
             mockMvc.perform(
-                get("/api/platform/tenants")
+                get("/api/admin/platform/tenants")
                     .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken"),
             )
                 .andExpect(status().isOk)

@@ -7,6 +7,8 @@ import org.springframework.data.jpa.repository.JpaRepository
 interface TenantRepository : JpaRepository<Tenant, Long> {
     fun existsByNameIgnoreCaseAndDeletedAtIsNull(name: String): Boolean
 
+    fun findAllByDeletedAtIsNullOrderByCreatedAtAsc(): List<Tenant>
+
     fun findAllByOwnerUser_IdAndDeletedAtIsNullOrderByCreatedAtAsc(ownerUserId: Long): List<Tenant>
 
     fun findByIdAndDeletedAtIsNull(id: Long): Optional<Tenant>

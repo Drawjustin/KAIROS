@@ -30,10 +30,12 @@ data class TenantOutput(
 )
 
 data class TenantResponse(
+    @field:Schema(description = "생성된 tenant 정보")
     val result: TenantOutput,
 ) : BaseOutput()
 
 data class TenantsResponse(
+    @field:Schema(description = "조회된 tenant 목록")
     val result: List<TenantOutput>,
 ) : BaseOutput()
 
@@ -62,10 +64,12 @@ data class ProjectOutput(
 )
 
 data class ProjectsResponse(
+    @field:Schema(description = "조회된 project 목록")
     val result: List<ProjectOutput>,
 ) : BaseOutput()
 
 data class ProjectResponse(
+    @field:Schema(description = "생성된 project 정보")
     val result: ProjectOutput,
 ) : BaseOutput()
 
@@ -105,9 +109,11 @@ data class ApiKeyIssueOutput(
 )
 
 data class ApiKeyIssueResponse(
+    @field:Schema(description = "방금 발급된 API key와 메타데이터")
     val result: ApiKeyIssueOutput,
 ) : BaseOutput()
 
 data class ApiKeysResponse(
+    @field:Schema(description = "조회된 API key 메타데이터 목록")
     val result: List<ApiKeyOutput>,
 ) : BaseOutput()
