@@ -13,7 +13,10 @@ import io.github.drawjustin.kairos.auth.dto.RegisterRequest
 import io.github.drawjustin.kairos.common.api.BaseOutput
 import io.github.drawjustin.kairos.common.error.KairosErrorCode
 import io.github.drawjustin.kairos.auth.repository.RefreshSessionRepository
+import io.github.drawjustin.kairos.apikey.repository.ApiKeyRepository
 import java.time.Instant
+import io.github.drawjustin.kairos.project.repository.ProjectRepository
+import io.github.drawjustin.kairos.tenant.repository.TenantRepository
 import io.github.drawjustin.kairos.user.entity.UserRole
 import io.github.drawjustin.kairos.user.repository.UserRepository
 import org.assertj.core.api.Assertions.assertThat
@@ -48,9 +51,21 @@ class AuthIntegrationTests : IntegrationTestSupport() {
     @Autowired
     lateinit var refreshSessionRepository: RefreshSessionRepository
 
+    @Autowired
+    lateinit var tenantRepository: TenantRepository
+
+    @Autowired
+    lateinit var projectRepository: ProjectRepository
+
+    @Autowired
+    lateinit var apiKeyRepository: ApiKeyRepository
+
     @BeforeEach
     fun setUp() {
         // 테스트 간 데이터 누수를 막기 위해 매번 초기화한다.
+        apiKeyRepository.deleteAllInBatch()
+        projectRepository.deleteAllInBatch()
+        tenantRepository.deleteAllInBatch()
         refreshSessionRepository.deleteAllInBatch()
         userRepository.deleteAllInBatch()
     }

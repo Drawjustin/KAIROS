@@ -12,15 +12,15 @@ abstract class IntegrationTestSupport {
     companion object {
         @Container
         @JvmStatic
-        // 기능별 통합 테스트가 모두 같은 PostgreSQL 테스트 환경을 공유한다.
+        // 기능별 통합 테스트가 모두 같은 PostgreSQL 테스트 환경 설정을 공유한다.
         val postgres = PostgreSQLContainer<Nothing>("postgres:16-alpine")
 
-    @JvmStatic
-    @DynamicPropertySource
-    // SpringBootTest가 뜰 때 datasource를 컨테이너 DB로 연결한다.
-    fun configureProperties(registry: DynamicPropertyRegistry) {
-        // 컨테이너가 띄운 접속 정보를 Spring datasource로 주입한다.
-        registry.add("spring.datasource.url", postgres::getJdbcUrl)
+        @JvmStatic
+        @DynamicPropertySource
+        // SpringBootTest가 뜰 때 datasource를 컨테이너 DB로 연결한다.
+        fun configureProperties(registry: DynamicPropertyRegistry) {
+            // 컨테이너가 띄운 접속 정보를 Spring datasource로 주입한다.
+            registry.add("spring.datasource.url", postgres::getJdbcUrl)
             registry.add("spring.datasource.username", postgres::getUsername)
             registry.add("spring.datasource.password", postgres::getPassword)
             registry.add("spring.datasource.driver-class-name", postgres::getDriverClassName)
