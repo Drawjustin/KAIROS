@@ -1,4 +1,4 @@
-create table if not exists refresh_sessions (
+create table if not exists refresh_session (
     id bigserial primary key,
     user_id bigint not null references users(id) on delete cascade,
     session_id varchar(100) not null unique,
@@ -14,5 +14,5 @@ create table if not exists refresh_sessions (
     updated_at timestamp with time zone not null default current_timestamp
 );
 
-create index if not exists idx_refresh_sessions_user_id on refresh_sessions(user_id);
-create index if not exists idx_refresh_sessions_expires_at on refresh_sessions(expires_at);
+create index if not exists idx_refresh_session_user_id on refresh_session(user_id);
+create index if not exists idx_refresh_session_expires_at on refresh_session(expires_at);
