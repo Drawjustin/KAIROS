@@ -6,8 +6,12 @@ import io.github.drawjustin.kairos.platform.dto.ApiKeyIssueResponse
 import io.github.drawjustin.kairos.platform.dto.ApiKeysResponse
 import io.github.drawjustin.kairos.platform.dto.CreateApiKeyRequest
 import io.github.drawjustin.kairos.platform.dto.CreateProjectRequest
+import io.github.drawjustin.kairos.platform.dto.CreateTenantUserRequest
 import io.github.drawjustin.kairos.platform.dto.ProjectResponse
 import io.github.drawjustin.kairos.platform.dto.ProjectsResponse
+import io.github.drawjustin.kairos.platform.dto.TenantUserResponse
+import io.github.drawjustin.kairos.platform.dto.TenantUsersResponse
+import io.github.drawjustin.kairos.platform.dto.UpdateTenantUserRoleRequest
 import io.github.drawjustin.kairos.platform.service.PlatformManagementService
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.Parameter
@@ -20,8 +24,10 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses
 import io.swagger.v3.oas.annotations.security.SecurityRequirement
 import io.swagger.v3.oas.annotations.tags.Tag
 import jakarta.validation.Valid
+import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.security.core.annotation.AuthenticationPrincipal
 import org.springframework.web.bind.annotation.GetMapping
+import org.springframework.web.bind.annotation.PatchMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
@@ -35,6 +41,147 @@ import org.springframework.web.bind.annotation.RestController
 class PlatformController(
     private val platformManagementService: PlatformManagementService,
 ) {
+    @GetMapping("/tenants/{tenantId}/users")
+    @Operation(summary = "tenant 사용자 목록 조회", description = "지정한 tenant에 속한 사용자 목록을 조회한다. 해당 tenant의 OWNER/ADMIN 역할 사용자 또는 플랫폼 ADMIN만 가능하다.")
+    @SecurityRequirement(name = "bearerAuth")
+    @ApiResponses(
+        value = [
+            ApiResponse(
+                responseCode = "200",
+                description = "tenant 사용자 목록 조회 성공",
+                headers = [Header(name = "X-Trace-Id", description = "요청 추적용 trace identifier")],
+            ),
+            ApiResponse(
+                responseCode = "403",
+                description = "tenant 접근 권한 없음",
+                content = [Content(schema = Schema(implementation = BaseOutput::class))],
+            ),
+            ApiResponse(
+                responseCode = "404",
+                description = "tenant를 찾을 수 없음",
+                content = [Content(schema = Schema(implementation = BaseOutput::class))],
+            ),
+        ],
+    )
+    // 목록 조회는 OWNER/ADMIN까지만 열어, 실무에서 tenant 구성원 확인과 운영을 바로 연결할 수 있게 한다.
+    fun listTenantUsers(
+        @AuthenticationPrincipal principal: AuthenticatedUser,
+        @Parameter(description = "사용자 목록을 조회할 tenant ID", example = "1")
+        @PathVariable tenantId: Long,
+    ): TenantUsersResponse = TenantUsersResponse(
+        result = platformManagementService.listTenantUsers(principal, tenantId),
+    )
+
+    @PostMapping("/tenants/{tenantId}/users")
+    @Operation(summary = "tenant 사용자 추가", description = "지정한 tenant에 기존 사용자를 추가하고 역할을 부여한다. 해당 tenant의 OWNER 또는 플랫폼 ADMIN만 가능하다.")
+    @SecurityRequirement(name = "bearerAuth")
+    @ApiResponses(
+        value = [
+            ApiResponse(
+                responseCode = "200",
+                description = "tenant 사용자 추가 성공",
+                headers = [Header(name = "X-Trace-Id", description = "요청 추적용 trace identifier")],
+            ),
+            ApiResponse(
+                responseCode = "403",
+                description = "tenant 사용자 관리 권한 없음",
+                content = [Content(schema = Schema(implementation = BaseOutput::class))],
+            ),
+            ApiResponse(
+                responseCode = "404",
+                description = "tenant 또는 user를 찾을 수 없음",
+                content = [Content(schema = Schema(implementation = BaseOutput::class))],
+            ),
+            ApiResponse(
+                responseCode = "409",
+                description = "이미 추가된 tenant 사용자",
+                content = [Content(schema = Schema(implementation = BaseOutput::class))],
+            ),
+        ],
+    )
+    // 멤버 추가와 역할 부여는 OWNER만 가능하게 두어 tenant 내부 권한 승격을 단순하게 통제한다.
+    fun createTenantUser(
+        @AuthenticationPrincipal principal: AuthenticatedUser,
+        @Parameter(description = "사용자를 추가할 tenant ID", example = "1")
+        @PathVariable tenantId: Long,
+        @Valid @RequestBody request: CreateTenantUserRequest,
+    ): TenantUserResponse = TenantUserResponse(
+        result = platformManagementService.createTenantUser(principal, tenantId, request),
+    )
+
+    @PatchMapping("/tenant-users/{tenantUserId}")
+    @Operation(summary = "tenant 사용자 역할 변경", description = "tenant 사용자의 역할을 변경한다. 해당 tenant의 OWNER 또는 플랫폼 ADMIN만 가능하다.")
+    @SecurityRequirement(name = "bearerAuth")
+    @ApiResponses(
+        value = [
+            ApiResponse(
+                responseCode = "200",
+                description = "tenant 사용자 역할 변경 성공",
+                headers = [Header(name = "X-Trace-Id", description = "요청 추적용 trace identifier")],
+            ),
+            ApiResponse(
+                responseCode = "403",
+                description = "tenant 사용자 관리 권한 없음",
+                content = [Content(schema = Schema(implementation = BaseOutput::class))],
+            ),
+            ApiResponse(
+                responseCode = "404",
+                description = "tenant_user를 찾을 수 없음",
+                content = [Content(schema = Schema(implementation = BaseOutput::class))],
+            ),
+            ApiResponse(
+                responseCode = "409",
+                description = "마지막 OWNER를 제거하려는 시도",
+                content = [Content(schema = Schema(implementation = BaseOutput::class))],
+            ),
+        ],
+    )
+    // 마지막 OWNER가 사라지면 tenant가 고아 상태가 되므로 역할 변경 시 최소 한 명은 유지한다.
+    fun updateTenantUserRole(
+        @AuthenticationPrincipal principal: AuthenticatedUser,
+        @Parameter(description = "역할을 바꿀 tenant_user ID", example = "1")
+        @PathVariable tenantUserId: Long,
+        @Valid @RequestBody request: UpdateTenantUserRoleRequest,
+    ): TenantUserResponse = TenantUserResponse(
+        result = platformManagementService.updateTenantUserRole(principal, tenantUserId, request),
+    )
+
+    @DeleteMapping("/tenant-users/{tenantUserId}")
+    @Operation(summary = "tenant 사용자 제거", description = "tenant에서 사용자를 제거한다. 해당 tenant의 OWNER 또는 플랫폼 ADMIN만 가능하다.")
+    @SecurityRequirement(name = "bearerAuth")
+    @ApiResponses(
+        value = [
+            ApiResponse(
+                responseCode = "200",
+                description = "tenant 사용자 제거 성공",
+                headers = [Header(name = "X-Trace-Id", description = "요청 추적용 trace identifier")],
+            ),
+            ApiResponse(
+                responseCode = "403",
+                description = "tenant 사용자 관리 권한 없음",
+                content = [Content(schema = Schema(implementation = BaseOutput::class))],
+            ),
+            ApiResponse(
+                responseCode = "404",
+                description = "tenant_user를 찾을 수 없음",
+                content = [Content(schema = Schema(implementation = BaseOutput::class))],
+            ),
+            ApiResponse(
+                responseCode = "409",
+                description = "마지막 OWNER를 제거하려는 시도",
+                content = [Content(schema = Schema(implementation = BaseOutput::class))],
+            ),
+        ],
+    )
+    // tenant 멤버 제거도 OWNER만 가능하게 맞춰야 권한 위임 규칙이 흔들리지 않는다.
+    fun deleteTenantUser(
+        @AuthenticationPrincipal principal: AuthenticatedUser,
+        @Parameter(description = "제거할 tenant_user ID", example = "1")
+        @PathVariable tenantUserId: Long,
+    ) = BaseOutput().also {
+        platformManagementService.deleteTenantUser(principal, tenantUserId)
+    }
+
     @PostMapping("/tenants/{tenantId}/projects")
     @Operation(summary = "project 생성", description = "지정한 tenant 아래에 새 project를 생성한다. 해당 tenant의 OWNER/ADMIN 역할 사용자 또는 플랫폼 ADMIN만 가능하다.")
     @SecurityRequirement(name = "bearerAuth")

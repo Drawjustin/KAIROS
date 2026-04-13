@@ -13,12 +13,17 @@ import io.github.drawjustin.kairos.platform.dto.ApiKeysResponse
 import io.github.drawjustin.kairos.platform.dto.CreateApiKeyRequest
 import io.github.drawjustin.kairos.platform.dto.CreateProjectRequest
 import io.github.drawjustin.kairos.platform.dto.CreateTenantRequest
+import io.github.drawjustin.kairos.platform.dto.CreateTenantUserRequest
 import io.github.drawjustin.kairos.platform.dto.ProjectResponse
 import io.github.drawjustin.kairos.platform.dto.ProjectsResponse
 import io.github.drawjustin.kairos.platform.dto.TenantResponse
+import io.github.drawjustin.kairos.platform.dto.TenantUserResponse
+import io.github.drawjustin.kairos.platform.dto.TenantUsersResponse
 import io.github.drawjustin.kairos.platform.dto.TenantsResponse
+import io.github.drawjustin.kairos.platform.dto.UpdateTenantUserRoleRequest
 import io.github.drawjustin.kairos.project.entity.ProjectEnvironment
 import io.github.drawjustin.kairos.project.repository.ProjectRepository
+import io.github.drawjustin.kairos.tenant.entity.TenantUserRole
 import io.github.drawjustin.kairos.tenant.repository.TenantRepository
 import io.github.drawjustin.kairos.tenant.repository.TenantUserRepository
 import io.github.drawjustin.kairos.user.entity.UserRole
@@ -33,7 +38,9 @@ import org.springframework.http.HttpHeaders
 import org.springframework.http.MediaType
 import org.springframework.test.context.ActiveProfiles
 import org.springframework.test.web.servlet.MockMvc
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 
@@ -269,6 +276,138 @@ class PlatformManagementIntegrationTests : IntegrationTestSupport() {
             }
     }
 
+    @Test
+    fun `owner can add update list and delete tenant users`() {
+        register(RegisterRequest(email = "platform-admin@example.com", password = "password123"))
+        val platformAdmin = userRepository.findByEmailAndDeletedAtIsNull("platform-admin@example.com").orElseThrow()
+        platformAdmin.role = UserRole.ADMIN
+        userRepository.save(platformAdmin)
+        val platformAdminLogin = login(LoginRequest(email = "platform-admin@example.com", password = "password123"))
+
+        register(RegisterRequest(email = "member1@example.com", password = "password123"))
+        register(RegisterRequest(email = "member2@example.com", password = "password123"))
+
+        val tenant = createTenant(platformAdminLogin.accessToken, CreateTenantRequest(name = "tenant-user-team"))
+        val addedUser = createTenantUser(
+            platformAdminLogin.accessToken,
+            tenant.id,
+            CreateTenantUserRequest(email = "member1@example.com", role = TenantUserRole.MEMBER),
+        )
+        assertThat(addedUser.email).isEqualTo("member1@example.com")
+        assertThat(addedUser.role).isEqualTo(TenantUserRole.MEMBER)
+
+        val listedUsers = listTenantUsers(platformAdminLogin.accessToken, tenant.id)
+        assertThat(listedUsers.map { it.email })
+            .contains("platform-admin@example.com", "member1@example.com")
+
+        val updatedUser = updateTenantUserRole(
+            platformAdminLogin.accessToken,
+            addedUser.id,
+            UpdateTenantUserRoleRequest(role = TenantUserRole.ADMIN),
+        )
+        assertThat(updatedUser.role).isEqualTo(TenantUserRole.ADMIN)
+
+        val anotherUser = createTenantUser(
+            platformAdminLogin.accessToken,
+            tenant.id,
+            CreateTenantUserRequest(email = "member2@example.com", role = TenantUserRole.MEMBER),
+        )
+        deleteTenantUser(platformAdminLogin.accessToken, anotherUser.id)
+
+        val remainingUsers = listTenantUsers(platformAdminLogin.accessToken, tenant.id)
+        assertThat(remainingUsers.map { it.email })
+            .contains("platform-admin@example.com", "member1@example.com")
+            .doesNotContain("member2@example.com")
+    }
+
+    @Test
+    fun `tenant admin can list users but cannot manage them`() {
+        register(RegisterRequest(email = "platform-admin2@example.com", password = "password123"))
+        val platformAdmin = userRepository.findByEmailAndDeletedAtIsNull("platform-admin2@example.com").orElseThrow()
+        platformAdmin.role = UserRole.ADMIN
+        userRepository.save(platformAdmin)
+        val platformAdminLogin = login(LoginRequest(email = "platform-admin2@example.com", password = "password123"))
+
+        register(RegisterRequest(email = "tenant-operator@example.com", password = "password123"))
+        register(RegisterRequest(email = "tenant-member@example.com", password = "password123"))
+
+        val tenant = createTenant(platformAdminLogin.accessToken, CreateTenantRequest(name = "tenant-user-policy-team"))
+        val tenantAdminMembership = createTenantUser(
+            platformAdminLogin.accessToken,
+            tenant.id,
+            CreateTenantUserRequest(email = "tenant-operator@example.com", role = TenantUserRole.ADMIN),
+        )
+
+        val tenantAdminLogin = login(LoginRequest(email = "tenant-operator@example.com", password = "password123"))
+
+        val listedUsers = listTenantUsers(tenantAdminLogin.accessToken, tenant.id)
+        assertThat(listedUsers.map { it.email })
+            .contains("platform-admin2@example.com", "tenant-operator@example.com")
+
+        mockMvc.perform(
+            post("/api/platform/tenants/${tenant.id}/users")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer ${tenantAdminLogin.accessToken}")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    objectMapper.writeValueAsBytes(
+                        CreateTenantUserRequest(email = "tenant-member@example.com", role = TenantUserRole.MEMBER),
+                    ),
+                ),
+        )
+            .andExpect(status().isForbidden)
+            .andExpect { result ->
+                val response = objectMapper.readValue(result.response.contentAsByteArray, BaseOutput::class.java)
+                assertThat(response.errorCode).isEqualTo("TENANTUSER_003")
+            }
+
+        mockMvc.perform(
+            patch("/api/platform/tenant-users/${tenantAdminMembership.id}")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer ${tenantAdminLogin.accessToken}")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsBytes(UpdateTenantUserRoleRequest(role = TenantUserRole.MEMBER))),
+        )
+            .andExpect(status().isForbidden)
+            .andExpect { result ->
+                val response = objectMapper.readValue(result.response.contentAsByteArray, BaseOutput::class.java)
+                assertThat(response.errorCode).isEqualTo("TENANTUSER_003")
+            }
+    }
+
+    @Test
+    fun `cannot remove last tenant owner`() {
+        register(RegisterRequest(email = "platform-admin3@example.com", password = "password123"))
+        val platformAdmin = userRepository.findByEmailAndDeletedAtIsNull("platform-admin3@example.com").orElseThrow()
+        platformAdmin.role = UserRole.ADMIN
+        userRepository.save(platformAdmin)
+        val platformAdminLogin = login(LoginRequest(email = "platform-admin3@example.com", password = "password123"))
+
+        val tenant = createTenant(platformAdminLogin.accessToken, CreateTenantRequest(name = "last-owner-team"))
+        val ownerMembership = listTenantUsers(platformAdminLogin.accessToken, tenant.id)
+            .single { it.email == "platform-admin3@example.com" }
+
+        mockMvc.perform(
+            patch("/api/platform/tenant-users/${ownerMembership.id}")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer ${platformAdminLogin.accessToken}")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsBytes(UpdateTenantUserRoleRequest(role = TenantUserRole.ADMIN))),
+        )
+            .andExpect(status().isConflict)
+            .andExpect { result ->
+                val response = objectMapper.readValue(result.response.contentAsByteArray, BaseOutput::class.java)
+                assertThat(response.errorCode).isEqualTo("TENANTUSER_004")
+            }
+
+        mockMvc.perform(
+            delete("/api/platform/tenant-users/${ownerMembership.id}")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer ${platformAdminLogin.accessToken}"),
+        )
+            .andExpect(status().isConflict)
+            .andExpect { result ->
+                val response = objectMapper.readValue(result.response.contentAsByteArray, BaseOutput::class.java)
+                assertThat(response.errorCode).isEqualTo("TENANTUSER_004")
+            }
+    }
+
     private fun register(request: RegisterRequest): AuthOutput {
         val result = mockMvc.perform(
             post("/api/auth/register")
@@ -319,6 +458,54 @@ class PlatformManagementIntegrationTests : IntegrationTestSupport() {
                 .response.contentAsByteArray,
             TenantsResponse::class.java,
         ).result
+
+    private fun createTenantUser(accessToken: String, tenantId: Long, request: CreateTenantUserRequest) =
+        objectMapper.readValue(
+            mockMvc.perform(
+                post("/api/platform/tenants/$tenantId/users")
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsBytes(request)),
+            )
+                .andExpect(status().isOk)
+                .andReturn()
+                .response.contentAsByteArray,
+            TenantUserResponse::class.java,
+        ).result
+
+    private fun listTenantUsers(accessToken: String, tenantId: Long) =
+        objectMapper.readValue(
+            mockMvc.perform(
+                get("/api/platform/tenants/$tenantId/users")
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken"),
+            )
+                .andExpect(status().isOk)
+                .andReturn()
+                .response.contentAsByteArray,
+            TenantUsersResponse::class.java,
+        ).result
+
+    private fun updateTenantUserRole(accessToken: String, tenantUserId: Long, request: UpdateTenantUserRoleRequest) =
+        objectMapper.readValue(
+            mockMvc.perform(
+                patch("/api/platform/tenant-users/$tenantUserId")
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsBytes(request)),
+            )
+                .andExpect(status().isOk)
+                .andReturn()
+                .response.contentAsByteArray,
+            TenantUserResponse::class.java,
+        ).result
+
+    private fun deleteTenantUser(accessToken: String, tenantUserId: Long) {
+        mockMvc.perform(
+            delete("/api/platform/tenant-users/$tenantUserId")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken"),
+        )
+            .andExpect(status().isOk)
+    }
 
     private fun createProject(accessToken: String, tenantId: Long, request: CreateProjectRequest) =
         // 상위 tenant 경로를 그대로 사용해 실제 라우팅 구조와 동일하게 검증한다.

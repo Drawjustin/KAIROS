@@ -11,8 +11,11 @@ import io.github.drawjustin.kairos.platform.dto.ApiKeyOutput
 import io.github.drawjustin.kairos.platform.dto.CreateApiKeyRequest
 import io.github.drawjustin.kairos.platform.dto.CreateProjectRequest
 import io.github.drawjustin.kairos.platform.dto.CreateTenantRequest
+import io.github.drawjustin.kairos.platform.dto.CreateTenantUserRequest
 import io.github.drawjustin.kairos.platform.dto.ProjectOutput
 import io.github.drawjustin.kairos.platform.dto.TenantOutput
+import io.github.drawjustin.kairos.platform.dto.TenantUserOutput
+import io.github.drawjustin.kairos.platform.dto.UpdateTenantUserRoleRequest
 import io.github.drawjustin.kairos.project.entity.Project
 import io.github.drawjustin.kairos.project.repository.ProjectRepository
 import io.github.drawjustin.kairos.tenant.entity.Tenant
@@ -82,14 +85,79 @@ class PlatformManagementService(
             .map { it.toOutput() }
     }
 
+    @Transactional(readOnly = true)
+    fun listTenantUsers(principal: AuthenticatedUser, tenantId: Long): List<TenantUserOutput> {
+        // tenant 사용자 목록은 OWNER/ADMIN 또는 플랫폼 ADMIN만 조회할 수 있다.
+        resolveTenantForRole(principal, tenantId, managerRoles())
+        return tenantUserRepository.findAllByTenant_IdAndDeletedAtIsNullOrderByCreatedAtAsc(tenantId)
+            .map { it.toOutput() }
+    }
+
+    @Transactional
+    fun createTenantUser(
+        principal: AuthenticatedUser,
+        tenantId: Long,
+        request: CreateTenantUserRequest,
+    ): TenantUserOutput {
+        // 멤버 초대와 역할 부여는 tenant OWNER 또는 플랫폼 ADMIN만 처리하게 둔다.
+        val tenant = resolveTenantForRole(principal, tenantId, ownerRoles())
+        val user = userRepository.findByEmailAndDeletedAtIsNull(request.email.trim())
+            .orElseThrow { KairosException(KairosErrorCode.USER_NOT_FOUND) }
+        if (tenantUserRepository.existsByTenant_IdAndUser_IdAndDeletedAtIsNull(tenantId, requireNotNull(user.id))) {
+            throw KairosException(KairosErrorCode.TENANT_USER_ALREADY_EXISTS)
+        }
+
+        val tenantUser = tenantUserRepository.save(
+            TenantUser(
+                tenant = tenant,
+                user = user,
+                role = request.role,
+            ),
+        )
+        return tenantUser.toOutput()
+    }
+
+    @Transactional
+    fun updateTenantUserRole(
+        principal: AuthenticatedUser,
+        tenantUserId: Long,
+        request: UpdateTenantUserRoleRequest,
+    ): TenantUserOutput {
+        val tenantUser = tenantUserRepository.findByIdAndDeletedAtIsNull(tenantUserId)
+            .orElseThrow { KairosException(KairosErrorCode.TENANT_USER_NOT_FOUND) }
+        val tenantId = requireNotNull(tenantUser.tenant.id) { "Tenant user tenant id must exist" }
+        requireTenantOwner(principal, tenantId)
+
+        if (tenantUser.role == TenantUserRole.OWNER && request.role != TenantUserRole.OWNER) {
+            validateLastOwner(tenantId)
+        }
+
+        tenantUser.role = request.role
+        return tenantUser.toOutput()
+    }
+
+    @Transactional
+    fun deleteTenantUser(principal: AuthenticatedUser, tenantUserId: Long) {
+        val tenantUser = tenantUserRepository.findByIdAndDeletedAtIsNull(tenantUserId)
+            .orElseThrow { KairosException(KairosErrorCode.TENANT_USER_NOT_FOUND) }
+        val tenantId = requireNotNull(tenantUser.tenant.id) { "Tenant user tenant id must exist" }
+        requireTenantOwner(principal, tenantId)
+
+        if (tenantUser.role == TenantUserRole.OWNER) {
+            validateLastOwner(tenantId)
+        }
+
+        tenantUserRepository.delete(tenantUser)
+    }
+
     @Transactional
     fun createProject(
         principal: AuthenticatedUser,
         tenantId: Long,
         request: CreateProjectRequest,
     ): ProjectOutput {
-        // project 생성 전에는 tenant membership 권한부터 확인해 다른 회사 영역을 건드리지 못하게 한다.
-        val tenant = resolveOwnedTenant(principal, tenantId)
+        // project 생성은 tenant의 OWNER/ADMIN 또는 플랫폼 ADMIN으로 제한한다.
+        val tenant = resolveTenantForRole(principal, tenantId, managerRoles())
         val name = request.name.trim()
         if (projectRepository.existsByTenant_IdAndNameIgnoreCaseAndDeletedAtIsNull(tenantId, name)) {
             throw KairosException(KairosErrorCode.PROJECT_ALREADY_EXISTS)
@@ -108,7 +176,7 @@ class PlatformManagementService(
 
     @Transactional(readOnly = true)
     fun listProjects(principal: AuthenticatedUser, tenantId: Long): List<ProjectOutput> {
-        resolveOwnedTenant(principal, tenantId)
+        resolveTenantForRole(principal, tenantId, managerRoles())
         return projectRepository.findAllByTenant_IdAndDeletedAtIsNullOrderByCreatedAtAsc(tenantId)
             .map { it.toOutput() }
     }
@@ -121,7 +189,7 @@ class PlatformManagementService(
     ): ApiKeyIssueOutput {
         // API key 발급 주체를 남겨 이후 감사 로그나 운영 이력 추적에 쓸 수 있게 한다.
         val creator = principal.toActiveUser()
-        val project = resolveOwnedProject(principal, projectId)
+        val project = resolveManagedProject(principal, projectId)
         val name = request.name.trim()
         if (apiKeyRepository.existsByProject_IdAndNameIgnoreCaseAndDeletedAtIsNull(projectId, name)) {
             throw KairosException(KairosErrorCode.API_KEY_ALREADY_EXISTS)
@@ -149,20 +217,24 @@ class PlatformManagementService(
 
     @Transactional(readOnly = true)
     fun listApiKeys(principal: AuthenticatedUser, projectId: Long): List<ApiKeyOutput> {
-        resolveOwnedProject(principal, projectId)
+        resolveManagedProject(principal, projectId)
         return apiKeyRepository.findAllByProject_IdAndDeletedAtIsNullOrderByCreatedAtAsc(projectId)
             .map { it.toOutput() }
     }
 
-    private fun resolveOwnedTenant(principal: AuthenticatedUser, tenantId: Long): Tenant {
-        // tenant 권한은 tenant_user의 OWNER/ADMIN 역할 또는 플랫폼 ADMIN 여부로 판정한다.
+    private fun resolveTenantForRole(
+        principal: AuthenticatedUser,
+        tenantId: Long,
+        allowedRoles: Collection<TenantUserRole>,
+    ): Tenant {
+        // 플랫폼 ADMIN은 모든 tenant를 다루고, 일반 사용자는 tenant_user 역할 기준으로만 접근한다.
         val tenant = tenantRepository.findByIdAndDeletedAtIsNull(tenantId)
             .orElseThrow { KairosException(KairosErrorCode.TENANT_NOT_FOUND) }
         if (principal.role != UserRole.ADMIN &&
             !tenantUserRepository.existsByTenant_IdAndUser_IdAndRoleInAndDeletedAtIsNull(
                 tenantId = tenantId,
                 userId = principal.id,
-                roles = listOf(TenantUserRole.OWNER, TenantUserRole.ADMIN),
+                roles = allowedRoles,
             )
         ) {
             throw KairosException(KairosErrorCode.TENANT_ACCESS_DENIED)
@@ -170,8 +242,8 @@ class PlatformManagementService(
         return tenant
     }
 
-    private fun resolveOwnedProject(principal: AuthenticatedUser, projectId: Long): Project {
-        // project 권한도 상위 tenant의 membership 역할을 그대로 따른다.
+    private fun resolveManagedProject(principal: AuthenticatedUser, projectId: Long): Project {
+        // project 권한도 상위 tenant의 OWNER/ADMIN 정책을 그대로 따른다.
         val project = projectRepository.findByIdAndDeletedAtIsNull(projectId)
             .orElseThrow { KairosException(KairosErrorCode.PROJECT_NOT_FOUND) }
         val tenantId = requireNotNull(project.tenant.id) { "Project tenant id must exist" }
@@ -179,12 +251,32 @@ class PlatformManagementService(
             !tenantUserRepository.existsByTenant_IdAndUser_IdAndRoleInAndDeletedAtIsNull(
                 tenantId = tenantId,
                 userId = principal.id,
-                roles = listOf(TenantUserRole.OWNER, TenantUserRole.ADMIN),
+                roles = managerRoles(),
             )
         ) {
             throw KairosException(KairosErrorCode.PROJECT_ACCESS_DENIED)
         }
         return project
+    }
+
+    private fun requireTenantOwner(principal: AuthenticatedUser, tenantId: Long) {
+        if (principal.role == UserRole.ADMIN) {
+            return
+        }
+        if (!tenantUserRepository.existsByTenant_IdAndUser_IdAndRoleInAndDeletedAtIsNull(
+                tenantId = tenantId,
+                userId = principal.id,
+                roles = ownerRoles(),
+            )
+        ) {
+            throw KairosException(KairosErrorCode.TENANT_USER_MANAGEMENT_FORBIDDEN)
+        }
+    }
+
+    private fun validateLastOwner(tenantId: Long) {
+        if (tenantUserRepository.countByTenant_IdAndRoleAndDeletedAtIsNull(tenantId, TenantUserRole.OWNER) <= 1L) {
+            throw KairosException(KairosErrorCode.TENANT_LAST_OWNER_REQUIRED)
+        }
     }
 
     private fun AuthenticatedUser.toActiveUser(): User =
@@ -197,6 +289,15 @@ class PlatformManagementService(
         name = name,
         status = status,
         createdAt = requireNotNull(createdAt) { "Tenant createdAt must exist" },
+    )
+
+    private fun TenantUser.toOutput(): TenantUserOutput = TenantUserOutput(
+        id = requireNotNull(id) { "TenantUser id must exist" },
+        tenantId = requireNotNull(tenant.id) { "TenantUser tenant id must exist" },
+        userId = requireNotNull(user.id) { "TenantUser user id must exist" },
+        email = user.email,
+        role = role,
+        createdAt = requireNotNull(createdAt) { "TenantUser createdAt must exist" },
     )
 
     private fun Project.toOutput(): ProjectOutput = ProjectOutput(
@@ -229,5 +330,9 @@ class PlatformManagementService(
 
     companion object {
         private const val KEY_PREVIEW_LENGTH = 18
+
+        private fun ownerRoles() = listOf(TenantUserRole.OWNER)
+
+        private fun managerRoles() = listOf(TenantUserRole.OWNER, TenantUserRole.ADMIN)
     }
 }
