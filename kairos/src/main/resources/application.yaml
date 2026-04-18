@@ -17,6 +17,10 @@ kairos:
     secret: ${KAIROS_JWT_SECRET}
     access-token-expiration: ${KAIROS_JWT_ACCESS_TOKEN_EXPIRATION:15m}
     refresh-token-expiration: ${KAIROS_JWT_REFRESH_TOKEN_EXPIRATION:30d}
+  ai:
+    openai:
+      base-url: ${KAIROS_AI_OPENAI_BASE_URL:https://api.openai.com}
+      api-key: ${KAIROS_AI_OPENAI_API_KEY:}
 
 logging:
   pattern:

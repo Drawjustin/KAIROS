@@ -33,6 +33,7 @@ class SecurityConfig(
                     "/api/auth/login",
                     "/api/auth/refresh",
                     "/api/auth/logout",
+                    "/api/v1/chat/completions",
                     "/swagger-ui.html",
                     "/swagger-ui/**",
                     "/v3/api-docs/**",

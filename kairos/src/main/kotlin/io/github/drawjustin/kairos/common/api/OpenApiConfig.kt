@@ -25,13 +25,23 @@ class OpenApiConfig {
                     ),
             )
             .components(
-                Components().addSecuritySchemes(
-                    "bearerAuth",
-                    SecurityScheme()
-                        .name("Authorization")
-                        .type(SecurityScheme.Type.HTTP)
-                        .scheme("bearer")
-                        .bearerFormat("JWT"),
-                ),
+                Components()
+                    .addSecuritySchemes(
+                        "bearerAuth",
+                        SecurityScheme()
+                            .name("Authorization")
+                            .type(SecurityScheme.Type.HTTP)
+                            .scheme("bearer")
+                            .bearerFormat("JWT"),
+                    )
+                    .addSecuritySchemes(
+                        "apiKeyBearerAuth",
+                        SecurityScheme()
+                            .name("Authorization")
+                            .description("KAIROS project API key를 입력한다. Swagger UI가 자동으로 `Bearer ` 접두사를 붙인다.")
+                            .type(SecurityScheme.Type.HTTP)
+                            .scheme("bearer")
+                            .bearerFormat("API Key"),
+                    ),
             )
 }

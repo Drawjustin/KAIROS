@@ -30,6 +30,12 @@ enum class KairosErrorCode(
     PROJECT_NOT_FOUND(HttpStatus.NOT_FOUND, "PROJECT_002", "Project not found"),
     PROJECT_ACCESS_DENIED(HttpStatus.FORBIDDEN, "PROJECT_003", "Access denied to project"),
     API_KEY_ALREADY_EXISTS(HttpStatus.CONFLICT, "APIKEY_001", "API key already exists"),
+    AI_INVALID_API_KEY(HttpStatus.UNAUTHORIZED, "AI_001", "Invalid API key"),
+    AI_API_KEY_EXPIRED(HttpStatus.UNAUTHORIZED, "AI_002", "API key expired"),
+    AI_PROJECT_INACTIVE(HttpStatus.FORBIDDEN, "AI_003", "Project is not active"),
+    AI_STREAM_NOT_SUPPORTED(HttpStatus.BAD_REQUEST, "AI_004", "Streaming is not supported yet"),
+    AI_PROVIDER_NOT_CONFIGURED(HttpStatus.INTERNAL_SERVER_ERROR, "AI_005", "AI provider is not configured"),
+    AI_PROVIDER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "AI_006", "AI provider request failed"),
     INVALID_INPUT(HttpStatus.BAD_REQUEST, "COMMON_001", "Invalid input"),
     INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "COMMON_999", "Internal server error", slackError = true),
 }
