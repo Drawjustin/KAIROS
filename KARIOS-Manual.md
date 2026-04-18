@@ -1,104 +1,158 @@
 # KAIROS
 
-Multi-LLM Gateway and Observability Platform
+> Enterprise AI Gateway and Operations Platform
 
-KAIROS는 여러 AI 모델 제공자를 하나의 일관된 API로 추상화하고, 인증/권한, 라우팅, 장애 대응, 비용 통제, 관측 가능성을 중앙화하는 백엔드 플랫폼입니다. 단순한 LLM 프록시가 아니라, 여러 서비스와 팀이 AI 기능을 안정적으로 운영할 수 있도록 돕는 `AI Gateway + 운영 플랫폼`을 목표로 합니다.
+KAIROS는 기업 내부에서 AI를 더 안전하고, 일관되게, 운영 가능하게 만들기 위한 백엔드 플랫폼입니다.
 
-## Why
+단순히 여러 LLM API를 중계하는 프록시가 아니라,  
+인증과 권한, 모델 라우팅, 비용 통제, 장애 대응, 관측 가능성, 그리고 내부 문서·도구·시스템 연결까지 하나의 계층에서 관리하는 **Enterprise AI Gateway**를 목표로 합니다.
 
-AI 기능을 서비스에 도입할 때 다음과 같은 문제가 자주 발생합니다.
+즉, KAIROS는 "모델을 대신 호출해주는 서버"가 아니라  
+**조직이 AI를 실제 업무와 서비스에 도입할 때 필요한 운영 문제를 해결하는 플랫폼**입니다.
 
-- 모델 제공자마다 API 형식이 다름
-- 어떤 팀이 어떤 모델을 얼마나 사용하는지 파악하기 어려움
-- 비용, 에러율, 지연시간을 통합 관리하기 어려움
-- 특정 provider 장애 시 전체 서비스가 영향을 받음
-- 요청량 증가에 대비한 quota, rate limit, budget 정책이 필요함
+## 아키텍처 개요
 
-KAIROS는 이런 문제를 해결하기 위해 설계되었습니다.
+```mermaid
+flowchart LR
+    A["Client Apps<br/>Web / Backend / Internal Tools"] --> B["KAIROS"]
 
-## Goals
+    B --> C["Unified Chat API<br/>/api/v1/chat/completions"]
+    B --> D["Platform API<br/>Tenant / Project / API Key"]
 
-- 여러 LLM provider를 하나의 API로 통합
-- tenant별 인증, 권한, quota, budget 정책 적용
-- fallback, retry, circuit breaker 기반 장애 대응
-- 요청 수, 응답시간, 에러율, 토큰 사용량, 비용 추적
-- Kafka 기반 비동기 이벤트 파이프라인 구축
-- Prometheus, Grafana, OpenTelemetry 기반 관측 환경 제공
+    C --> E["API Key Authentication"]
+    C --> F["Unified AI Service"]
+    F --> G["Provider Adapter"]
+    G --> H["OpenAI"]
+    G --> I["Gemini"]
+    G --> J["Claude"]
 
-## Core Features
+    F --> U["Usage Logging"]
 
-- Unified AI API
-- Multi-provider routing
-- API key authentication
-- Tenant-based quota and budget control
-- Rate limiting
-- Fallback and resilience policies
-- Usage and cost tracking
-- Prometheus metrics
-- Structured logging
-- Distributed tracing
-- Kafka event pipeline
-- Admin APIs for platform operations
+    D --> K["Tenant"]
+    D --> L["Project"]
+    D --> M["Tenant User"]
+    D --> N["API Key"]
 
-## Architecture
+    B --> O["Internal Context Extension"]
+    O --> P["Docs / Wiki"]
+    O --> Q["Internal Tools"]
+    O --> R["MCP Servers"]
 
-KAIROS는 다음과 같은 구성으로 동작합니다.
+    K --> S["Policy Boundary"]
+    L --> S
+    M --> S
+    N --> S
 
-- API Gateway
-- Routing Engine
-- Provider Adapters
-- Policy Service
-- Usage Service
-- Kafka Event Producer/Consumer
-- PostgreSQL
-- Redis
-- Prometheus / Grafana
-- Loki / Tempo
+```
 
-요청은 Gateway를 통해 들어오고, 정책 검증과 라우팅을 거쳐 적절한 AI provider로 전달됩니다. 응답 이후에는 사용량, 비용, 실패 이벤트가 비동기적으로 수집되며, 운영자는 대시보드를 통해 전체 상태를 확인할 수 있습니다.
+현재 범위에서는 **Unified AI API**, **API key 인증**, **tenant / project 기반 운영 경계**, **Provider Adapter**, **사용량 추적의 출발점**까지를 먼저 구현합니다.  
+이후 필요에 따라 내부 문서 검색, Tool Calling, MCP 기반 확장으로 자연스럽게 이어질 수 있도록 구조를 잡고 있습니다.
 
-## Tech Stack
-- Java
-- Kotlin
-- Spring Boot
-- PostgreSQL
-- Redis
-- Kafka
-- Prometheus
-- Grafana
 
-## What This Project Demonstrates
+## 왜 KAIROS가 필요한가
 
-이 프로젝트는 단순히 AI API를 호출하는 예제가 아니라, 실제 서비스 환경에서 필요한 백엔드 역량을 보여주는 데 초점을 맞춥니다.
+AI 기능을 서비스나 사내 업무에 붙이기 시작하면 금방 이런 문제가 생깁니다.
 
-- 멀티 provider 추상화
-- 운영 정책 중앙화
-- 장애 허용 설계
-- 비용 및 사용량 통제
-- 관측 가능성 확보
-- 비동기 이벤트 기반 데이터 처리
-- 플랫폼 백엔드 아키텍처 설계
+- 팀마다 선호하는 AI API 형식이 다릅니다.
+- 모델 제공자마다 요청 방식, 가격, 장애 특성이 다릅니다.
+- 어떤 팀이 어떤 모델을 얼마나 쓰는지 파악하기 어렵습니다.
+- 비용, 에러율, 응답시간을 중앙에서 관리하기 어렵습니다.
+- 특정 provider 장애가 여러 서비스에 동시에 영향을 줄 수 있습니다.
+- quota, rate limit, budget 같은 운영 정책이 필요합니다.
+- 사내 AI는 문서, 위키, 코드, 운영 도구 같은 내부 컨텍스트에 안전하게 접근해야 합니다.
 
-## Target Use Cases
+KAIROS는 이런 문제를 "모델 호출"이 아니라  
+**모델 위의 운영 계층**을 표준화하는 방식으로 해결하려고 합니다.
 
-- 여러 팀이 공통 AI 인프라를 사용하는 환경
-- AI 기능을 서비스에 안전하게 도입하고 싶은 경우
-- 비용, 성능, 안정성을 함께 관리해야 하는 경우
-- LLM 서비스 운영을 위한 Gateway 계층이 필요한 경우
+## KAIROS가 지향하는 것
 
-## Project Status
+KAIROS는 다음을 중앙에서 다루는 플랫폼을 지향합니다.
 
-In Progress
+- 여러 AI provider를 공통 실행 계층으로 추상화
+- tenant, project 단위 인증과 권한 관리
+- API key 기반 호출 통제
+- 모델 라우팅, fallback, retry 같은 장애 대응
+- 사용량, 비용, 에러율, 지연시간 추적
+- quota, rate limit, budget 정책 적용
+- 내부 문서와 도구 연결을 위한 확장 지점 제공
+- 향후 RAG, Tool Calling, MCP 통합까지 이어질 수 있는 구조
 
-## Future Work
+한마디로 정리하면:
 
-- Streaming response support
-- Semantic cache
-- OPA-based policy engine
-- Canary routing for new model rollout
-- Admin console UI
-- Usage anomaly detection
+> KAIROS는 기업이 AI를 "호출"하는 것을 넘어서,  
+> **통제하고, 추적하고, 운영할 수 있게 만드는 플랫폼**입니다.
 
-## Motivation
+## 어떤 환경에 잘 맞는가
 
-이 프로젝트는 AI 시대에도 경쟁력 있는 서버 백엔드 개발자가 되기 위해, 단순 기능 개발을 넘어서 `운영 가능한 AI 플랫폼`을 직접 설계하고 구현하는 것을 목표로 시작했습니다. 특히 대규모 서비스 환경에서 중요한 인증, 정책, 장애 대응, 메트릭, 비용 관리 문제를 백엔드 관점에서 해결하는 데 집중합니다.
+KAIROS는 특히 이런 환경에 잘 맞습니다.
+
+- 여러 팀이 공통 AI 인프라를 함께 써야 하는 조직
+- AI 사용량과 비용을 중앙에서 관리해야 하는 환경
+- 특정 모델에 종속되지 않고 운영 유연성을 확보하고 싶은 경우
+- 내부 문서, 사내 시스템, 운영 도구를 AI와 연결하려는 경우
+- 향후 MCP, Tool Calling, RAG 같은 구조까지 확장하려는 경우
+
+작은 서비스에서 단일 모델만 빠르게 붙이는 용도라면 과할 수 있습니다.  
+하지만 여러 팀, 여러 기능, 여러 정책이 엮이기 시작하면 KAIROS 같은 운영 계층의 필요성이 분명해집니다.
+
+## 핵심 개념
+
+### Tenant
+
+조직 경계입니다.  
+부서, 팀, 본부, 워크스페이스처럼 정책과 비용을 함께 관리할 수 있는 단위로 사용할 수 있습니다.
+
+### Project
+
+실제 AI 기능 단위입니다.  
+예를 들면 사내 문서 검색, 고객 응대 봇, 코드 리뷰 도우미, 장애 분석 보조 도구 같은 개별 서비스를 의미합니다.
+
+### Tenant User
+
+tenant에 속한 사용자와 역할을 정의합니다.  
+이를 통해 누가 어떤 tenant와 project를 운영할 수 있는지 통제할 수 있습니다.
+
+### API Key
+
+project 단위 호출 자격 증명입니다.  
+AI API 호출을 project 단위로 분리하고, 사용량과 비용을 추적하며, 정책을 적용하는 기준점이 됩니다.
+
+## KAIROS의 포지션
+
+KAIROS는 단순한 멀티 LLM 프록시가 아닙니다.
+
+KAIROS가 진짜로 풀고 싶은 문제는 다음과 같습니다.
+
+- AI 모델 접근을 어떻게 통제할 것인가
+- 내부 컨텍스트 접근을 어떻게 안전하게 열어줄 것인가
+- 어떤 팀이 어떤 정책 아래 어떤 AI 기능을 쓰는지 어떻게 관리할 것인가
+- 비용과 장애를 어떻게 운영 관점에서 다룰 것인가
+
+그래서 KAIROS는 다음 세 가지를 함께 묶는 방향을 지향합니다.
+
+- **AI Gateway**
+- **운영 정책 플랫폼**
+- **사내 AI 실행 기반**
+
+## 앞으로의 방향
+
+가까운 단계에서는 다음을 우선 만듭니다.
+
+1. Unified AI API
+2. Provider Adapter 구조
+3. API key 인증
+4. 사용량 및 비용 로깅
+5. tenant / project 기반 운영 경계
+
+그다음 단계에서는 아래로 확장할 수 있습니다.
+
+- RAG 연동
+- Tool Calling
+- MCP 기반 내부 도구 연결
+- 정책 엔진 고도화
+- Budget / Quota 자동화
+- 대시보드와 운영 콘솔
+
+## 한 줄 소개
+
+**KAIROS는 기업이 외부 AI 모델을 쓰더라도, 내부 정책과 운영 통제를 유지한 채 AI를 서비스와 업무에 연결할 수 있게 만드는 Enterprise AI Gateway입니다.**
