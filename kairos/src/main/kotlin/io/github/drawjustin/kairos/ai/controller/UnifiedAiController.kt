@@ -29,7 +29,7 @@ class UnifiedAiController(
     private val unifiedAiService: UnifiedAiService,
 ) {
     @PostMapping("/chat/completions")
-    @Operation(summary = "chat completion 호출", description = "OpenAI 호환 형태의 공통 chat completion 엔드포인트다. 현재는 non-streaming 요청과 OpenAI, Claude provider를 지원한다.")
+    @Operation(summary = "chat completion 호출", description = "OpenAI 호환 형태의 공통 chat completion 엔드포인트다. 현재는 non-streaming 요청과 OpenAI, Claude, Gemini provider를 지원한다.")
     @SecurityRequirement(name = "apiKeyBearerAuth")
     @ApiResponses(
         value = [
