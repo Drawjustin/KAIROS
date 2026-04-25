@@ -21,28 +21,31 @@ flowchart LR
 
     C --> E["API Key Authentication"]
     C --> F["Unified AI Service"]
-    F --> G["Provider Adapter"]
-    G --> H["OpenAI Chat API"]
+    F --> G["Provider Router"]
+    G --> H["OpenAI Adapter"]
+    G --> I["Claude Adapter"]
+    H --> J["OpenAI Chat API"]
+    I --> K["Claude Messages API"]
 
-    F --> I["Usage Logging"]
+    F --> L["Usage Logging"]
 
-    D --> J["Tenant"]
-    D --> K["Project"]
-    D --> L["Tenant User"]
-    D --> M["API Key"]
+    D --> M["Tenant"]
+    D --> N["Project"]
+    D --> O["Tenant User"]
+    D --> P["API Key"]
 
-    B --> N["Internal Context Extension"]
-    N --> O["Docs / Wiki"]
-    N --> P["Internal Tools"]
-    N --> Q["MCP Servers"]
+    B --> Q["Internal Context Extension"]
+    Q --> R["Docs / Wiki"]
+    Q --> S["Internal Tools"]
+    Q --> T["MCP Servers"]
 
-    J --> R["Policy Boundary"]
-    K --> R
-    L --> R
-    M --> R
+    M --> U["Policy Boundary"]
+    N --> U
+    O --> U
+    P --> U
 ```
 
-현재 범위에서는 **Unified Chat API 연결**, **OpenAI 연동**, **API key 인증**, **tenant / project 기반 운영 경계**, **Provider Adapter**, **사용량 추적의 출발점**까지를 먼저 구현합니다.  
+현재 범위에서는 **Unified Chat API 연결**, **OpenAI / Claude 연동**, **API key 인증**, **tenant / project 기반 운영 경계**, **Provider Router / Adapter**, **사용량 추적의 출발점**까지를 먼저 구현합니다.  
 이후 필요에 따라 내부 문서 검색, Tool Calling, MCP 기반 확장으로 자연스럽게 이어질 수 있도록 구조를 잡고 있습니다.
 
 ## 왜 KAIROS가 필요한가

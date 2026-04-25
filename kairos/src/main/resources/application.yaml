@@ -21,6 +21,10 @@ kairos:
     openai:
       base-url: ${KAIROS_AI_OPENAI_BASE_URL:https://api.openai.com}
       api-key: ${KAIROS_AI_OPENAI_API_KEY:}
+    anthropic:
+      base-url: ${KAIROS_AI_ANTHROPIC_BASE_URL:https://api.anthropic.com}
+      api-key: ${KAIROS_AI_ANTHROPIC_API_KEY:}
+      version: ${KAIROS_AI_ANTHROPIC_VERSION:2023-06-01}
 
 logging:
   pattern:

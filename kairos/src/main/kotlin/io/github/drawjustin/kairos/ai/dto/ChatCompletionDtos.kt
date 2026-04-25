@@ -88,11 +88,14 @@ data class ChatUsageResponse(
 enum class AiModel(
     @get:JsonValue
     val value: String,
+    val provider: AiProvider,
 ) {
-    GPT_4O_MINI("gpt-4o-mini"),
-    GPT_4O("gpt-4o"),
-    GEMINI_2_5_FLASH("gemini-2.5-flash"),
-    CLAUDE_3_5_SONNET("claude-3-5-sonnet");
+    GPT_4O_MINI("gpt-4o-mini", AiProvider.OPENAI),
+    GPT_4O("gpt-4o", AiProvider.OPENAI),
+    GEMINI_2_5_FLASH("gemini-2.5-flash", AiProvider.GEMINI),
+    CLAUDE_OPUS_4_7("claude-opus-4-7", AiProvider.CLAUDE),
+    CLAUDE_SONNET_4_6("claude-sonnet-4-6", AiProvider.CLAUDE),
+    CLAUDE_HAIKU_4_5("claude-haiku-4-5-20251001", AiProvider.CLAUDE);
 
     companion object {
         @JvmStatic
@@ -101,4 +104,10 @@ enum class AiModel(
             entries.firstOrNull { it.value == value }
                 ?: throw IllegalArgumentException("Unsupported model: $value")
     }
+}
+
+enum class AiProvider {
+    OPENAI,
+    GEMINI,
+    CLAUDE,
 }

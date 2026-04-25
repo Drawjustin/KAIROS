@@ -10,6 +10,7 @@ import io.github.drawjustin.kairos.ai.dto.ChatMessageResponse
 import io.github.drawjustin.kairos.ai.dto.ChatUsageResponse
 import io.github.drawjustin.kairos.ai.dto.AiModel
 import io.github.drawjustin.kairos.ai.provider.ProviderAdapter
+import io.github.drawjustin.kairos.ai.provider.ProviderRouter
 import io.github.drawjustin.kairos.auth.dto.AuthOutput
 import io.github.drawjustin.kairos.auth.dto.AuthResponse
 import io.github.drawjustin.kairos.auth.dto.LoginRequest
@@ -30,6 +31,7 @@ import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.mockito.BDDMockito.given
+import org.mockito.Mockito.mock
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc
 import org.springframework.boot.test.context.SpringBootTest
@@ -69,6 +71,8 @@ class UnifiedAiIntegrationTests : IntegrationTestSupport() {
     lateinit var projectRepository: ProjectRepository
 
     @MockitoBean
+    lateinit var providerRouter: ProviderRouter
+
     lateinit var providerAdapter: ProviderAdapter
 
     @BeforeEach
@@ -77,6 +81,7 @@ class UnifiedAiIntegrationTests : IntegrationTestSupport() {
         jdbcTemplate.execute(
             "truncate table api_key, project, tenant_user, tenant, refresh_session, users restart identity cascade",
         )
+        providerAdapter = mock(ProviderAdapter::class.java)
     }
 
     @Test
@@ -95,7 +100,17 @@ class UnifiedAiIntegrationTests : IntegrationTestSupport() {
             ),
         )
 
-        given(providerAdapter.chatCompletion(request))
+        val enrichedRequest = request.copy(
+            messages = listOf(
+                ChatMessageRequest(
+                    role = "system",
+                    content = "너는 KAIROS의 사내 AI 어시스턴트다. 내부 문서를 우선 참고하고, 근거 없는 내용은 추측하지 마라.",
+                ),
+            ) + request.messages,
+        )
+
+        given(providerRouter.route(AiModel.GPT_4O_MINI)).willReturn(providerAdapter)
+        given(providerAdapter.chatCompletion(enrichedRequest))
             .willReturn(
                 ChatCompletionResponse(
                     id = "chatcmpl_test_123",
