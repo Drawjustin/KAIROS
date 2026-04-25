@@ -2,7 +2,7 @@ package io.github.drawjustin.kairos.ai.service
 
 import io.github.drawjustin.kairos.ai.dto.ChatCompletionRequest
 import io.github.drawjustin.kairos.ai.dto.ChatCompletionResponse
- import io.github.drawjustin.kairos.ai.dto.ChatMessageRequest
+import io.github.drawjustin.kairos.ai.dto.ChatMessageRequest
 import io.github.drawjustin.kairos.ai.provider.ProviderRouter
 import io.github.drawjustin.kairos.common.error.KairosErrorCode
 import io.github.drawjustin.kairos.common.error.KairosException
@@ -13,22 +13,50 @@ import org.springframework.stereotype.Service
 class UnifiedAiService(
     private val aiApiKeyService: AiApiKeyService,
     private val providerRouter: ProviderRouter,
+    private val aiUsageLoggingService: AiUsageLoggingService,
 ) {
     fun chatCompletion(
         authorizationHeader: String?,
         request: ChatCompletionRequest,
     ): ChatCompletionResponse {
-
         if (request.stream) {
             throw KairosException(KairosErrorCode.AI_STREAM_NOT_SUPPORTED)
         }
 
         val apiKey = extractBearerToken(authorizationHeader)
-        aiApiKeyService.authenticate(apiKey)
+        val credential = aiApiKeyService.authenticate(apiKey)
 
         val enrichedRequest = request.withDefaultSystemPrompt()
         val providerAdapter = providerRouter.route(enrichedRequest.model)
-        return providerAdapter.chatCompletion(enrichedRequest)
+        val startedAt = System.nanoTime()
+        val response = try {
+            providerAdapter.chatCompletion(enrichedRequest)
+        } catch (exception: KairosException) {
+            aiUsageLoggingService.recordFailure(
+                apiKey = credential,
+                model = enrichedRequest.model,
+                latencyMs = elapsedMillis(startedAt),
+                errorCode = exception.errorCode.code,
+            )
+            throw exception
+        } catch (exception: Exception) {
+            aiUsageLoggingService.recordFailure(
+                apiKey = credential,
+                model = enrichedRequest.model,
+                latencyMs = elapsedMillis(startedAt),
+                errorCode = KairosErrorCode.INTERNAL_SERVER_ERROR.code,
+            )
+            throw exception
+        }
+        val latencyMs = elapsedMillis(startedAt)
+
+        aiUsageLoggingService.recordSuccess(
+            apiKey = credential,
+            model = enrichedRequest.model,
+            response = response,
+            latencyMs = latencyMs,
+        )
+        return response
     }
 
     private fun extractBearerToken(authorizationHeader: String?): String {
@@ -49,4 +77,7 @@ class UnifiedAiService(
                 ),
             ) + messages,
         )
+
+    private fun elapsedMillis(startedAt: Long): Long =
+        (System.nanoTime() - startedAt) / 1_000_000
 }
