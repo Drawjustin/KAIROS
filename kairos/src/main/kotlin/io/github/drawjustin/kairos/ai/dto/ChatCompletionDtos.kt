@@ -1,9 +1,7 @@
 package io.github.drawjustin.kairos.ai.dto
 
-import com.fasterxml.jackson.annotation.JsonCreator
 import com.fasterxml.jackson.annotation.JsonProperty
-import com.fasterxml.jackson.annotation.JsonValue
-import io.github.drawjustin.kairos.ai.type.AiProvider
+import io.github.drawjustin.kairos.ai.type.AiModel
 import io.github.drawjustin.kairos.ai.type.ChatRole
 import io.swagger.v3.oas.annotations.media.Schema
 import jakarta.validation.Valid
@@ -85,24 +83,3 @@ data class ChatUsageResponse(
     @field:JsonProperty("total_tokens")
     val totalTokens: Int,
 )
-
-enum class AiModel(
-    @get:JsonValue
-    val value: String,
-    val provider: AiProvider,
-) {
-    GPT_4O_MINI("gpt-4o-mini", AiProvider.OPENAI),
-    GPT_4O("gpt-4o", AiProvider.OPENAI),
-    GEMINI_2_5_FLASH("gemini-2.5-flash", AiProvider.GEMINI),
-    CLAUDE_OPUS_4_7("claude-opus-4-7", AiProvider.CLAUDE),
-    CLAUDE_SONNET_4_6("claude-sonnet-4-6", AiProvider.CLAUDE),
-    CLAUDE_HAIKU_4_5("claude-haiku-4-5-20251001", AiProvider.CLAUDE);
-
-    companion object {
-        @JvmStatic
-        @JsonCreator
-        fun fromValue(value: String): AiModel =
-            entries.firstOrNull { it.value == value }
-                ?: throw IllegalArgumentException("Unsupported model: $value")
-    }
-}

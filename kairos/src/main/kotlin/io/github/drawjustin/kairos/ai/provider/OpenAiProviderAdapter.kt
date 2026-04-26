@@ -1,7 +1,7 @@
 package io.github.drawjustin.kairos.ai.provider
 
 import io.github.drawjustin.kairos.ai.config.OpenAiProperties
-import io.github.drawjustin.kairos.ai.dto.AiModel
+import io.github.drawjustin.kairos.ai.type.AiModel
 import io.github.drawjustin.kairos.ai.dto.ChatChoiceResponse
 import io.github.drawjustin.kairos.ai.dto.ChatCompletionRequest
 import io.github.drawjustin.kairos.ai.dto.ChatCompletionResponse

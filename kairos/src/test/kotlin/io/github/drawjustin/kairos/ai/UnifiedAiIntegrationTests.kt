@@ -3,7 +3,7 @@ package io.github.drawjustin.kairos.ai
 import com.fasterxml.jackson.databind.ObjectMapper
 import io.github.drawjustin.kairos.IntegrationTestSupport
 import io.github.drawjustin.kairos.ai.repository.AiUsageLogRepository
-import io.github.drawjustin.kairos.ai.dto.AiModel
+import io.github.drawjustin.kairos.ai.type.AiModel
 import io.github.drawjustin.kairos.ai.type.AiUsageStatus
 import io.github.drawjustin.kairos.ai.dto.ChatChoiceResponse
 import io.github.drawjustin.kairos.ai.dto.ChatCompletionRequest
@@ -27,6 +27,8 @@ import io.github.drawjustin.kairos.platform.dto.CreateProjectRequest
 import io.github.drawjustin.kairos.platform.dto.CreateTenantRequest
 import io.github.drawjustin.kairos.platform.dto.ProjectResponse
 import io.github.drawjustin.kairos.platform.dto.TenantResponse
+import io.github.drawjustin.kairos.project.entity.ProjectAllowedModel
+import io.github.drawjustin.kairos.project.repository.ProjectAllowedModelRepository
 import io.github.drawjustin.kairos.project.repository.ProjectRepository
 import io.github.drawjustin.kairos.tenant.repository.TenantRepository
 import io.github.drawjustin.kairos.tenant.repository.TenantUserRepository
@@ -76,6 +78,9 @@ class UnifiedAiIntegrationTests : IntegrationTestSupport() {
     lateinit var projectRepository: ProjectRepository
 
     @Autowired
+    lateinit var projectAllowedModelRepository: ProjectAllowedModelRepository
+
+    @Autowired
     lateinit var aiUsageLogRepository: AiUsageLogRepository
 
     @MockitoBean
@@ -87,7 +92,7 @@ class UnifiedAiIntegrationTests : IntegrationTestSupport() {
     fun setUp() {
         // soft delete된 row까지 포함해 초기 상태를 맞춰 API key 인증 테스트가 흔들리지 않게 한다.
         jdbcTemplate.execute(
-            "truncate table ai_usage_log, api_key, project, tenant_user, tenant, refresh_session, users restart identity cascade",
+            "truncate table ai_usage_log, api_key, project_allowed_model, project, tenant_user, tenant, refresh_session, users restart identity cascade",
         )
         providerAdapter = mock(ProviderAdapter::class.java)
     }
@@ -194,6 +199,54 @@ class UnifiedAiIntegrationTests : IntegrationTestSupport() {
                 val response = objectMapper.readValue(result.response.contentAsByteArray, BaseOutput::class.java)
                 assertThat(response.errorCode).isEqualTo("AI_001")
             }
+    }
+
+    @Test
+    fun `chat completions rejects model that is not allowed for project`() {
+        val adminLogin = registerAdminAndLogin("ai-model-policy-admin@example.com")
+        val tenant = createTenant(adminLogin.accessToken, CreateTenantRequest(name = "ai-model-policy-team"))
+        val project = createProject(adminLogin.accessToken, tenant.id, CreateProjectRequest(name = "ai-model-policy-project"))
+        val issuedKey = createApiKey(adminLogin.accessToken, project.id, CreateApiKeyRequest(name = "default"))
+        val projectEntity = projectRepository.findByIdAndDeletedAtIsNull(project.id).orElseThrow()
+
+        val currentPolicies = projectAllowedModelRepository.findAllByProject_IdAndDeletedAtIsNullOrderByModelAsc(project.id)
+        projectAllowedModelRepository.deleteAll(currentPolicies)
+        projectAllowedModelRepository.flush()
+        projectAllowedModelRepository.save(
+            ProjectAllowedModel(
+                project = projectEntity,
+                model = AiModel.GEMINI_2_5_FLASH,
+            ),
+        )
+
+        mockMvc.perform(
+            post("/api/v1/chat/completions")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer ${issuedKey.apiKey}")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    objectMapper.writeValueAsBytes(
+                        ChatCompletionRequest(
+                            model = AiModel.GPT_4O_MINI,
+                            messages = listOf(
+                                ChatMessageRequest(
+                                    role = ChatRole.USER,
+                                    content = "안녕",
+                                ),
+                            ),
+                        ),
+                    ),
+                ),
+        )
+            .andExpect(status().isForbidden)
+            .andExpect { result ->
+                val response = objectMapper.readValue(result.response.contentAsByteArray, BaseOutput::class.java)
+                assertThat(response.errorCode).isEqualTo("AI_008")
+            }
+
+        val usageLog = aiUsageLogRepository.findAll().single()
+        assertThat(usageLog.project.id).isEqualTo(project.id)
+        assertThat(usageLog.status).isEqualTo(AiUsageStatus.FAILED)
+        assertThat(usageLog.errorCode).isEqualTo("AI_008")
     }
 
     @Test

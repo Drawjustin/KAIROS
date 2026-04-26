@@ -1,5 +1,6 @@
 package io.github.drawjustin.kairos.platform.service
 
+import io.github.drawjustin.kairos.ai.type.AiModel
 import io.github.drawjustin.kairos.ai.service.AiUsageService
 import io.github.drawjustin.kairos.apikey.entity.ApiKey
 import io.github.drawjustin.kairos.apikey.repository.ApiKeyRepository
@@ -15,13 +16,17 @@ import io.github.drawjustin.kairos.platform.dto.CreateTenantRequest
 import io.github.drawjustin.kairos.platform.dto.CreateTenantUserRequest
 import io.github.drawjustin.kairos.platform.dto.ProjectAiUsageSummaryOutput
 import io.github.drawjustin.kairos.platform.dto.ProjectAiUsageSummaryQuery
+import io.github.drawjustin.kairos.platform.dto.ProjectAllowedModelsOutput
 import io.github.drawjustin.kairos.platform.dto.ProjectOutput
 import io.github.drawjustin.kairos.platform.dto.TenantOutput
 import io.github.drawjustin.kairos.platform.dto.TenantAiUsageSummaryOutput
 import io.github.drawjustin.kairos.platform.dto.TenantAiUsageSummaryQuery
 import io.github.drawjustin.kairos.platform.dto.TenantUserOutput
+import io.github.drawjustin.kairos.platform.dto.UpdateProjectAllowedModelsRequest
 import io.github.drawjustin.kairos.platform.dto.UpdateTenantUserRoleRequest
 import io.github.drawjustin.kairos.project.entity.Project
+import io.github.drawjustin.kairos.project.entity.ProjectAllowedModel
+import io.github.drawjustin.kairos.project.repository.ProjectAllowedModelRepository
 import io.github.drawjustin.kairos.project.repository.ProjectRepository
 import io.github.drawjustin.kairos.tenant.entity.Tenant
 import io.github.drawjustin.kairos.tenant.entity.TenantUser
@@ -43,6 +48,7 @@ class PlatformManagementService(
     private val tenantRepository: TenantRepository,
     private val tenantUserRepository: TenantUserRepository,
     private val projectRepository: ProjectRepository,
+    private val projectAllowedModelRepository: ProjectAllowedModelRepository,
     private val apiKeyRepository: ApiKeyRepository,
     private val aiUsageService: AiUsageService,
     private val userRepository: UserRepository,
@@ -179,6 +185,7 @@ class PlatformManagementService(
                 environment = request.environment,
             ),
         )
+        saveAllowedModels(project, AiModel.entries)
 
         return project.toOutput()
     }
@@ -188,6 +195,38 @@ class PlatformManagementService(
         resolveTenantForRole(principal, tenantId, managerRoles())
         return projectRepository.findAllByTenant_IdAndDeletedAtIsNullOrderByCreatedAtAsc(tenantId)
             .map { it.toOutput() }
+    }
+
+    @Transactional(readOnly = true)
+    fun getProjectAllowedModels(principal: AuthenticatedUser, projectId: Long): ProjectAllowedModelsOutput {
+        val project = resolveManagedProject(principal, projectId)
+        val resolvedProjectId = requireNotNull(project.id) { "Project id must exist" }
+        return ProjectAllowedModelsOutput(
+            projectId = resolvedProjectId,
+            models = projectAllowedModelRepository.findAllByProject_IdAndDeletedAtIsNullOrderByModelAsc(resolvedProjectId)
+                .map { it.model },
+        )
+    }
+
+    @Transactional
+    fun updateProjectAllowedModels(
+        principal: AuthenticatedUser,
+        projectId: Long,
+        request: UpdateProjectAllowedModelsRequest,
+    ): ProjectAllowedModelsOutput {
+        val project = resolveManagedProject(principal, projectId)
+        val resolvedProjectId = requireNotNull(project.id) { "Project id must exist" }
+        val models = request.models.distinct()
+
+        val currentPolicies = projectAllowedModelRepository.findAllByProject_IdAndDeletedAtIsNullOrderByModelAsc(resolvedProjectId)
+        projectAllowedModelRepository.deleteAll(currentPolicies)
+        projectAllowedModelRepository.flush()
+        saveAllowedModels(project, models)
+
+        return ProjectAllowedModelsOutput(
+            projectId = resolvedProjectId,
+            models = models.sortedBy { it.name },
+        )
     }
 
     @Transactional
@@ -350,6 +389,17 @@ class PlatformManagementService(
         revokedAt = revokedAt,
         createdAt = requireNotNull(createdAt) { "ApiKey createdAt must exist" },
     )
+
+    private fun saveAllowedModels(project: Project, models: Collection<AiModel>) {
+        projectAllowedModelRepository.saveAll(
+            models.map {
+                ProjectAllowedModel(
+                    project = project,
+                    model = it,
+                )
+            },
+        )
+    }
 
     private fun generateApiKey(): String {
         // URL-safe base64를 써서 헤더/환경변수/로그 마스킹 처리와 함께 쓰기 쉽게 만든다.

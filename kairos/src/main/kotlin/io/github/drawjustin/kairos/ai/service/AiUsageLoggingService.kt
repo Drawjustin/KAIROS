@@ -1,6 +1,6 @@
 package io.github.drawjustin.kairos.ai.service
 
-import io.github.drawjustin.kairos.ai.dto.AiModel
+import io.github.drawjustin.kairos.ai.type.AiModel
 import io.github.drawjustin.kairos.ai.dto.ChatCompletionResponse
 import io.github.drawjustin.kairos.ai.entity.AiUsageLog
 import io.github.drawjustin.kairos.ai.repository.AiUsageLogRepository

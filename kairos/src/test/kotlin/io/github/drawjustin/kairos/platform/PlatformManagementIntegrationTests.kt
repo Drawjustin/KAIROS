@@ -2,6 +2,7 @@ package io.github.drawjustin.kairos.platform
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import io.github.drawjustin.kairos.IntegrationTestSupport
+import io.github.drawjustin.kairos.ai.type.AiModel
 import io.github.drawjustin.kairos.ai.entity.AiUsageLog
 import io.github.drawjustin.kairos.ai.repository.AiUsageLogRepository
 import io.github.drawjustin.kairos.ai.type.AiUsageStatus
@@ -19,6 +20,7 @@ import io.github.drawjustin.kairos.platform.dto.CreateProjectRequest
 import io.github.drawjustin.kairos.platform.dto.CreateTenantRequest
 import io.github.drawjustin.kairos.platform.dto.CreateTenantUserRequest
 import io.github.drawjustin.kairos.platform.dto.ProjectAiUsageSummaryResponse
+import io.github.drawjustin.kairos.platform.dto.ProjectAllowedModelsResponse
 import io.github.drawjustin.kairos.platform.dto.ProjectResponse
 import io.github.drawjustin.kairos.platform.dto.ProjectsResponse
 import io.github.drawjustin.kairos.platform.dto.TenantAiUsageSummaryResponse
@@ -26,6 +28,7 @@ import io.github.drawjustin.kairos.platform.dto.TenantResponse
 import io.github.drawjustin.kairos.platform.dto.TenantUserResponse
 import io.github.drawjustin.kairos.platform.dto.TenantUsersResponse
 import io.github.drawjustin.kairos.platform.dto.TenantsResponse
+import io.github.drawjustin.kairos.platform.dto.UpdateProjectAllowedModelsRequest
 import io.github.drawjustin.kairos.platform.dto.UpdateTenantUserRoleRequest
 import io.github.drawjustin.kairos.project.type.ProjectEnvironment
 import io.github.drawjustin.kairos.project.repository.ProjectRepository
@@ -51,6 +54,7 @@ import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delet
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 
 @SpringBootTest
@@ -92,7 +96,7 @@ class PlatformManagementIntegrationTests : IntegrationTestSupport() {
     fun setUp() {
         // soft delete된 row까지 포함해 완전히 비워야 다음 테스트의 FK와 unique 제약이 흔들리지 않는다.
         jdbcTemplate.execute(
-            "truncate table ai_usage_log, api_key, project, tenant_user, tenant, refresh_session, users restart identity cascade",
+            "truncate table ai_usage_log, api_key, project_allowed_model, project, tenant_user, tenant, refresh_session, users restart identity cascade",
         )
     }
 
@@ -173,6 +177,32 @@ class PlatformManagementIntegrationTests : IntegrationTestSupport() {
         val listedKeys = listApiKeys(loginResponse.accessToken, project.id)
         assertThat(listedKeys).hasSize(1)
         assertThat(listedKeys.first().keyPreview).isEqualTo(issuedKey.key.keyPreview)
+    }
+
+    @Test
+    fun `tenant manager can update project allowed models`() {
+        register(RegisterRequest(email = "model-policy-admin@example.com", password = "password123"))
+        val adminUser = userRepository.findByEmailAndDeletedAtIsNull("model-policy-admin@example.com").orElseThrow()
+        adminUser.role = UserRole.ADMIN
+        userRepository.save(adminUser)
+        val adminLogin = login(LoginRequest(email = "model-policy-admin@example.com", password = "password123"))
+        val tenant = createTenant(adminLogin.accessToken, CreateTenantRequest(name = "model-policy-team"))
+        val project = createProject(adminLogin.accessToken, tenant.id, CreateProjectRequest(name = "model-policy-project"))
+
+        val defaultModels = getProjectAllowedModels(adminLogin.accessToken, project.id).models
+        assertThat(defaultModels).containsExactlyElementsOf(AiModel.entries.sortedBy { it.name })
+
+        val updated = updateProjectAllowedModels(
+            adminLogin.accessToken,
+            project.id,
+            UpdateProjectAllowedModelsRequest(
+                models = listOf(AiModel.GPT_4O_MINI, AiModel.GEMINI_2_5_FLASH),
+            ),
+        )
+        assertThat(updated.models).containsExactlyInAnyOrder(AiModel.GPT_4O_MINI, AiModel.GEMINI_2_5_FLASH)
+
+        val reloaded = getProjectAllowedModels(adminLogin.accessToken, project.id)
+        assertThat(reloaded.models).containsExactlyInAnyOrder(AiModel.GPT_4O_MINI, AiModel.GEMINI_2_5_FLASH)
     }
 
     @Test
@@ -724,6 +754,32 @@ class PlatformManagementIntegrationTests : IntegrationTestSupport() {
                 .andReturn()
                 .response.contentAsByteArray,
             ProjectsResponse::class.java,
+        ).result
+
+    private fun getProjectAllowedModels(accessToken: String, projectId: Long) =
+        objectMapper.readValue(
+            mockMvc.perform(
+                get("/api/platform/projects/$projectId/allowed-models")
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken"),
+            )
+                .andExpect(status().isOk)
+                .andReturn()
+                .response.contentAsByteArray,
+            ProjectAllowedModelsResponse::class.java,
+        ).result
+
+    private fun updateProjectAllowedModels(accessToken: String, projectId: Long, request: UpdateProjectAllowedModelsRequest) =
+        objectMapper.readValue(
+            mockMvc.perform(
+                put("/api/platform/projects/$projectId/allowed-models")
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsBytes(request)),
+            )
+                .andExpect(status().isOk)
+                .andReturn()
+                .response.contentAsByteArray,
+            ProjectAllowedModelsResponse::class.java,
         ).result
 
     private fun createApiKey(accessToken: String, projectId: Long, request: CreateApiKeyRequest) =

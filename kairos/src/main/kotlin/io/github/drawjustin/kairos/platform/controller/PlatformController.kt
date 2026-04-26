@@ -9,12 +9,14 @@ import io.github.drawjustin.kairos.platform.dto.CreateProjectRequest
 import io.github.drawjustin.kairos.platform.dto.CreateTenantUserRequest
 import io.github.drawjustin.kairos.platform.dto.ProjectAiUsageSummaryQuery
 import io.github.drawjustin.kairos.platform.dto.ProjectAiUsageSummaryResponse
+import io.github.drawjustin.kairos.platform.dto.ProjectAllowedModelsResponse
 import io.github.drawjustin.kairos.platform.dto.ProjectResponse
 import io.github.drawjustin.kairos.platform.dto.ProjectsResponse
 import io.github.drawjustin.kairos.platform.dto.TenantAiUsageSummaryQuery
 import io.github.drawjustin.kairos.platform.dto.TenantAiUsageSummaryResponse
 import io.github.drawjustin.kairos.platform.dto.TenantUserResponse
 import io.github.drawjustin.kairos.platform.dto.TenantUsersResponse
+import io.github.drawjustin.kairos.platform.dto.UpdateProjectAllowedModelsRequest
 import io.github.drawjustin.kairos.platform.dto.UpdateTenantUserRoleRequest
 import io.github.drawjustin.kairos.platform.service.PlatformManagementService
 import io.swagger.v3.oas.annotations.Operation
@@ -34,6 +36,7 @@ import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PatchMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
+import org.springframework.web.bind.annotation.PutMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RestController
@@ -312,6 +315,78 @@ class PlatformController(
         @Valid query: TenantAiUsageSummaryQuery,
     ): TenantAiUsageSummaryResponse = TenantAiUsageSummaryResponse(
         result = platformManagementService.getTenantAiUsageSummary(principal, tenantId, query),
+    )
+
+    @GetMapping("/projects/{projectId}/allowed-models")
+    @Operation(
+        summary = "project 허용 모델 목록 조회",
+        description = "지정한 project에서 호출 가능한 AI 모델 목록을 조회한다. 해당 project의 tenant OWNER/ADMIN 또는 플랫폼 ADMIN만 가능하다.",
+    )
+    @SecurityRequirement(name = "bearerAuth")
+    @ApiResponses(
+        value = [
+            ApiResponse(
+                responseCode = "200",
+                description = "project 허용 모델 목록 조회 성공",
+                headers = [Header(name = "X-Trace-Id", description = "요청 추적용 trace identifier")],
+            ),
+            ApiResponse(
+                responseCode = "403",
+                description = "project 접근 권한 없음",
+                content = [Content(schema = Schema(implementation = BaseOutput::class))],
+            ),
+            ApiResponse(
+                responseCode = "404",
+                description = "project를 찾을 수 없음",
+                content = [Content(schema = Schema(implementation = BaseOutput::class))],
+            ),
+        ],
+    )
+    fun getProjectAllowedModels(
+        @AuthenticationPrincipal principal: AuthenticatedUser,
+        @Parameter(description = "허용 모델 정책을 조회할 project ID", example = "1")
+        @PathVariable projectId: Long,
+    ): ProjectAllowedModelsResponse = ProjectAllowedModelsResponse(
+        result = platformManagementService.getProjectAllowedModels(principal, projectId),
+    )
+
+    @PutMapping("/projects/{projectId}/allowed-models")
+    @Operation(
+        summary = "project 허용 모델 목록 변경",
+        description = "지정한 project에서 호출 가능한 AI 모델 목록을 교체한다. 해당 project의 tenant OWNER/ADMIN 또는 플랫폼 ADMIN만 가능하다.",
+    )
+    @SecurityRequirement(name = "bearerAuth")
+    @ApiResponses(
+        value = [
+            ApiResponse(
+                responseCode = "200",
+                description = "project 허용 모델 목록 변경 성공",
+                headers = [Header(name = "X-Trace-Id", description = "요청 추적용 trace identifier")],
+            ),
+            ApiResponse(
+                responseCode = "400",
+                description = "입력값 검증 실패",
+                content = [Content(schema = Schema(implementation = BaseOutput::class))],
+            ),
+            ApiResponse(
+                responseCode = "403",
+                description = "project 접근 권한 없음",
+                content = [Content(schema = Schema(implementation = BaseOutput::class))],
+            ),
+            ApiResponse(
+                responseCode = "404",
+                description = "project를 찾을 수 없음",
+                content = [Content(schema = Schema(implementation = BaseOutput::class))],
+            ),
+        ],
+    )
+    fun updateProjectAllowedModels(
+        @AuthenticationPrincipal principal: AuthenticatedUser,
+        @Parameter(description = "허용 모델 정책을 변경할 project ID", example = "1")
+        @PathVariable projectId: Long,
+        @Valid @RequestBody request: UpdateProjectAllowedModelsRequest,
+    ): ProjectAllowedModelsResponse = ProjectAllowedModelsResponse(
+        result = platformManagementService.updateProjectAllowedModels(principal, projectId, request),
     )
 
     @PostMapping("/projects/{projectId}/api-keys")

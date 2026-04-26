@@ -63,6 +63,7 @@ flowchart LR
 - API key 기반 AI 호출 인증
 - 성공/실패 AI 사용량 로그 저장
 - QueryDSL 기반 tenant/project 사용량 요약, project별 breakdown, provider/model별 breakdown 조회
+- project별 허용 모델 정책 관리와 AI 호출 차단
 - Flyway 기반 PostgreSQL 스키마 관리
 - Swagger 문서화, traceId 기반 요청 로그, Testcontainers 통합 테스트
 
@@ -155,11 +156,11 @@ KAIROS가 진짜로 풀고 싶은 문제는 다음과 같습니다.
 
 가까운 단계에서는 다음을 우선 만듭니다.
 
-1. project별 허용 모델 정책
-2. API key별 rate limit, quota, budget 정책
-3. provider timeout, retry, fallback 정책
-4. 내부 문서 검색과 MCP 기반 context provider
-5. 운영 대시보드와 사용량 시각화
+1. API key별 rate limit, quota, budget 정책
+2. provider timeout, retry, fallback 정책
+3. 내부 문서 검색과 MCP 기반 context provider
+4. 운영 대시보드와 사용량 시각화
+5. project별 문서/도구 접근 scope 정책
 
 그다음 단계에서는 아래로 확장할 수 있습니다.
 

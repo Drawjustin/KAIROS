@@ -7,6 +7,7 @@ import io.github.drawjustin.kairos.ai.provider.ProviderRouter
 import io.github.drawjustin.kairos.ai.type.ChatRole
 import io.github.drawjustin.kairos.common.error.KairosErrorCode
 import io.github.drawjustin.kairos.common.error.KairosException
+import io.github.drawjustin.kairos.project.repository.ProjectAllowedModelRepository
 import org.springframework.stereotype.Service
 
 @Service
@@ -15,6 +16,7 @@ class UnifiedAiService(
     private val aiApiKeyService: AiApiKeyService,
     private val providerRouter: ProviderRouter,
     private val aiUsageLoggingService: AiUsageLoggingService,
+    private val projectAllowedModelRepository: ProjectAllowedModelRepository,
 ) {
     fun chatCompletion(
         authorizationHeader: String?,
@@ -28,9 +30,13 @@ class UnifiedAiService(
         val credential = aiApiKeyService.authenticate(apiKey)
 
         val enrichedRequest = request.withDefaultSystemPrompt()
-        val providerAdapter = providerRouter.route(enrichedRequest.model)
         val startedAt = System.nanoTime()
         val response = try {
+            validateAllowedModel(
+                projectId = requireNotNull(credential.project.id) { "API key project id must exist" },
+                request = enrichedRequest,
+            )
+            val providerAdapter = providerRouter.route(enrichedRequest.model)
             providerAdapter.chatCompletion(enrichedRequest)
         } catch (exception: KairosException) {
             aiUsageLoggingService.recordFailure(
@@ -67,6 +73,12 @@ class UnifiedAiService(
             throw KairosException(KairosErrorCode.AI_INVALID_API_KEY)
         }
         return header.removePrefix("Bearer ").trim()
+    }
+
+    private fun validateAllowedModel(projectId: Long, request: ChatCompletionRequest) {
+        if (!projectAllowedModelRepository.existsByProject_IdAndModelAndDeletedAtIsNull(projectId, request.model)) {
+            throw KairosException(KairosErrorCode.AI_MODEL_NOT_ALLOWED)
+        }
     }
 
     private fun ChatCompletionRequest.withDefaultSystemPrompt(): ChatCompletionRequest =
