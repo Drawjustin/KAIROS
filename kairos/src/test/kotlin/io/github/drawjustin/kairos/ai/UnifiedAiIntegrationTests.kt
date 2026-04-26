@@ -13,6 +13,7 @@ import io.github.drawjustin.kairos.ai.dto.ChatMessageResponse
 import io.github.drawjustin.kairos.ai.dto.ChatUsageResponse
 import io.github.drawjustin.kairos.ai.provider.ProviderAdapter
 import io.github.drawjustin.kairos.ai.provider.ProviderRouter
+import io.github.drawjustin.kairos.ai.type.ChatRole
 import io.github.drawjustin.kairos.auth.dto.AuthOutput
 import io.github.drawjustin.kairos.auth.dto.AuthResponse
 import io.github.drawjustin.kairos.auth.dto.LoginRequest
@@ -101,7 +102,7 @@ class UnifiedAiIntegrationTests : IntegrationTestSupport() {
             model = AiModel.GPT_4O_MINI,
             messages = listOf(
                 ChatMessageRequest(
-                    role = "user",
+                    role = ChatRole.USER,
                     content = "안녕",
                 ),
             ),
@@ -110,7 +111,7 @@ class UnifiedAiIntegrationTests : IntegrationTestSupport() {
         val enrichedRequest = request.copy(
             messages = listOf(
                 ChatMessageRequest(
-                    role = "system",
+                    role = ChatRole.SYSTEM,
                     content = "너는 KAIROS의 사내 AI 어시스턴트다. 내부 문서를 우선 참고하고, 근거 없는 내용은 추측하지 마라.",
                 ),
             ) + request.messages,
@@ -128,7 +129,7 @@ class UnifiedAiIntegrationTests : IntegrationTestSupport() {
                         ChatChoiceResponse(
                             index = 0,
                             message = ChatMessageResponse(
-                                role = "assistant",
+                                role = ChatRole.ASSISTANT,
                                 content = "안녕하세요. 무엇을 도와드릴까요?",
                             ),
                             finishReason = "stop",
@@ -180,7 +181,7 @@ class UnifiedAiIntegrationTests : IntegrationTestSupport() {
                             model = AiModel.GPT_4O_MINI,
                             messages = listOf(
                                 ChatMessageRequest(
-                                    role = "user",
+                                    role = ChatRole.USER,
                                     content = "안녕",
                                 ),
                             ),
@@ -205,7 +206,7 @@ class UnifiedAiIntegrationTests : IntegrationTestSupport() {
             model = AiModel.GPT_4O_MINI,
             messages = listOf(
                 ChatMessageRequest(
-                    role = "user",
+                    role = ChatRole.USER,
                     content = "안녕",
                 ),
             ),
@@ -213,7 +214,7 @@ class UnifiedAiIntegrationTests : IntegrationTestSupport() {
         val enrichedRequest = request.copy(
             messages = listOf(
                 ChatMessageRequest(
-                    role = "system",
+                    role = ChatRole.SYSTEM,
                     content = "너는 KAIROS의 사내 AI 어시스턴트다. 내부 문서를 우선 참고하고, 근거 없는 내용은 추측하지 마라.",
                 ),
             ) + request.messages,

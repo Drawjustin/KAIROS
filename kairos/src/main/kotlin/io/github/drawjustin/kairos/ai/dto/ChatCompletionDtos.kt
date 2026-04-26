@@ -3,6 +3,8 @@ package io.github.drawjustin.kairos.ai.dto
 import com.fasterxml.jackson.annotation.JsonCreator
 import com.fasterxml.jackson.annotation.JsonProperty
 import com.fasterxml.jackson.annotation.JsonValue
+import io.github.drawjustin.kairos.ai.type.AiProvider
+import io.github.drawjustin.kairos.ai.type.ChatRole
 import io.swagger.v3.oas.annotations.media.Schema
 import jakarta.validation.Valid
 import jakarta.validation.constraints.DecimalMax
@@ -33,8 +35,7 @@ data class ChatCompletionRequest(
 
 data class ChatMessageRequest(
     @field:Schema(description = "메시지 역할", example = "user")
-    @field:NotBlank
-    val role: String,
+    val role: ChatRole,
     @field:Schema(description = "메시지 텍스트", example = "안녕하세요")
     @field:NotBlank
     @field:Size(max = 20_000)
@@ -68,7 +69,7 @@ data class ChatChoiceResponse(
 
 data class ChatMessageResponse(
     @field:Schema(description = "메시지 역할", example = "assistant")
-    val role: String,
+    val role: ChatRole,
     @field:Schema(description = "메시지 텍스트", example = "안녕하세요. 무엇을 도와드릴까요?")
     val content: String?,
 )
@@ -104,10 +105,4 @@ enum class AiModel(
             entries.firstOrNull { it.value == value }
                 ?: throw IllegalArgumentException("Unsupported model: $value")
     }
-}
-
-enum class AiProvider {
-    OPENAI,
-    GEMINI,
-    CLAUDE,
 }

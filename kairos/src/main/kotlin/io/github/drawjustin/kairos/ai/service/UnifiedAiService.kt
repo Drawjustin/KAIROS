@@ -4,6 +4,7 @@ import io.github.drawjustin.kairos.ai.dto.ChatCompletionRequest
 import io.github.drawjustin.kairos.ai.dto.ChatCompletionResponse
 import io.github.drawjustin.kairos.ai.dto.ChatMessageRequest
 import io.github.drawjustin.kairos.ai.provider.ProviderRouter
+import io.github.drawjustin.kairos.ai.type.ChatRole
 import io.github.drawjustin.kairos.common.error.KairosErrorCode
 import io.github.drawjustin.kairos.common.error.KairosException
 import org.springframework.stereotype.Service
@@ -72,7 +73,7 @@ class UnifiedAiService(
         copy(
             messages = listOf(
                 ChatMessageRequest(
-                    role = "system",
+                    role = ChatRole.SYSTEM,
                     content = "너는 KAIROS의 사내 AI 어시스턴트다. 내부 문서를 우선 참고하고, 근거 없는 내용은 추측하지 마라.",
                 ),
             ) + messages,

@@ -2,7 +2,6 @@ package io.github.drawjustin.kairos.ai.provider
 
 import io.github.drawjustin.kairos.ai.config.OpenAiProperties
 import io.github.drawjustin.kairos.ai.dto.AiModel
-import io.github.drawjustin.kairos.ai.dto.AiProvider
 import io.github.drawjustin.kairos.ai.dto.ChatChoiceResponse
 import io.github.drawjustin.kairos.ai.dto.ChatCompletionRequest
 import io.github.drawjustin.kairos.ai.dto.ChatCompletionResponse
@@ -14,6 +13,8 @@ import io.github.drawjustin.kairos.ai.provider.openai.OpenAiChatCompletionRespon
 import io.github.drawjustin.kairos.ai.provider.openai.OpenAiChatMessage
 import io.github.drawjustin.kairos.ai.provider.openai.OpenAiChatMessageResponse
 import io.github.drawjustin.kairos.ai.provider.openai.OpenAiChatUsage
+import io.github.drawjustin.kairos.ai.type.AiProvider
+import io.github.drawjustin.kairos.ai.type.ChatRole
 import io.github.drawjustin.kairos.common.error.KairosErrorCode
 import io.github.drawjustin.kairos.common.error.KairosException
 import org.springframework.http.HttpHeaders
@@ -62,7 +63,7 @@ class OpenAiProviderAdapter(
             model = model.value,
             messages = messages.map {
                 OpenAiChatMessage(
-                    role = it.role,
+                    role = it.role.value,
                     content = it.content,
                 )
             },
@@ -71,15 +72,15 @@ class OpenAiProviderAdapter(
             stream = stream,
         )
 
-        private fun OpenAiChatCompletionResponse.toChatCompletionResponse(): ChatCompletionResponse =
-            ChatCompletionResponse(
-                id = id,
-                `object` = `object`,
-                created = created,
-                model = model,
-                choices = choices.map { it.toChatChoiceResponse() },
-                usage = usage?.toChatUsageResponse(),
-            )
+    private fun OpenAiChatCompletionResponse.toChatCompletionResponse(): ChatCompletionResponse =
+        ChatCompletionResponse(
+            id = id,
+            `object` = `object`,
+            created = created,
+            model = model,
+            choices = choices.map { it.toChatChoiceResponse() },
+            usage = usage?.toChatUsageResponse(),
+        )
 
     private fun OpenAiChatChoice.toChatChoiceResponse(): ChatChoiceResponse =
         ChatChoiceResponse(
@@ -90,7 +91,7 @@ class OpenAiProviderAdapter(
 
     private fun OpenAiChatMessageResponse.toChatMessageResponse(): ChatMessageResponse =
         ChatMessageResponse(
-            role = role,
+            role = ChatRole.fromValue(role),
             content = content,
         )
 

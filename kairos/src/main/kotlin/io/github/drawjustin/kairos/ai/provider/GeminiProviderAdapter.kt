@@ -2,7 +2,6 @@ package io.github.drawjustin.kairos.ai.provider
 
 import io.github.drawjustin.kairos.ai.config.GeminiProperties
 import io.github.drawjustin.kairos.ai.dto.AiModel
-import io.github.drawjustin.kairos.ai.dto.AiProvider
 import io.github.drawjustin.kairos.ai.dto.ChatChoiceResponse
 import io.github.drawjustin.kairos.ai.dto.ChatCompletionRequest
 import io.github.drawjustin.kairos.ai.dto.ChatCompletionResponse
@@ -15,6 +14,8 @@ import io.github.drawjustin.kairos.ai.provider.gemini.GeminiGenerateContentRespo
 import io.github.drawjustin.kairos.ai.provider.gemini.GeminiGenerationConfig
 import io.github.drawjustin.kairos.ai.provider.gemini.GeminiPart
 import io.github.drawjustin.kairos.ai.provider.gemini.GeminiUsageMetadata
+import io.github.drawjustin.kairos.ai.type.AiProvider
+import io.github.drawjustin.kairos.ai.type.ChatRole
 import io.github.drawjustin.kairos.common.error.KairosErrorCode
 import io.github.drawjustin.kairos.common.error.KairosException
 import java.time.Instant
@@ -60,11 +61,11 @@ class GeminiProviderAdapter(
 
     private fun ChatCompletionRequest.toGeminiRequest(): GeminiGenerateContentRequest {
         val systemPrompt = messages
-            .filter { it.role == "system" }
+            .filter { it.role == ChatRole.SYSTEM }
             .joinToString("\n\n") { it.content }
             .ifBlank { null }
         val conversationContents = messages
-            .filterNot { it.role == "system" }
+            .filterNot { it.role == ChatRole.SYSTEM }
             .map {
                 GeminiContent(
                     role = it.role.toGeminiRole(),
@@ -84,10 +85,10 @@ class GeminiProviderAdapter(
         )
     }
 
-    private fun String.toGeminiRole(): String =
+    private fun ChatRole.toGeminiRole(): String =
         when (this) {
-            "assistant" -> "model"
-            else -> this
+            ChatRole.ASSISTANT -> "model"
+            else -> value
         }
 
     private fun GeminiGenerateContentResponse.toChatCompletionResponse(requestedModel: String): ChatCompletionResponse =
@@ -104,7 +105,7 @@ class GeminiProviderAdapter(
         ChatChoiceResponse(
             index = index ?: 0,
             message = ChatMessageResponse(
-                role = "assistant",
+                role = ChatRole.ASSISTANT,
                 content = content?.parts.orEmpty().joinToString("") { it.text },
             ),
             finishReason = finishReason,

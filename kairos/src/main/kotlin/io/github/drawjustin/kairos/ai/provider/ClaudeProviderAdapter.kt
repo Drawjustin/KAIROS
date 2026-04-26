@@ -2,7 +2,6 @@ package io.github.drawjustin.kairos.ai.provider
 
 import io.github.drawjustin.kairos.ai.config.AnthropicProperties
 import io.github.drawjustin.kairos.ai.dto.AiModel
-import io.github.drawjustin.kairos.ai.dto.AiProvider
 import io.github.drawjustin.kairos.ai.dto.ChatChoiceResponse
 import io.github.drawjustin.kairos.ai.dto.ChatCompletionRequest
 import io.github.drawjustin.kairos.ai.dto.ChatCompletionResponse
@@ -11,6 +10,8 @@ import io.github.drawjustin.kairos.ai.dto.ChatUsageResponse
 import io.github.drawjustin.kairos.ai.provider.claude.AnthropicMessage
 import io.github.drawjustin.kairos.ai.provider.claude.AnthropicMessageRequest
 import io.github.drawjustin.kairos.ai.provider.claude.AnthropicMessageResponse
+import io.github.drawjustin.kairos.ai.type.AiProvider
+import io.github.drawjustin.kairos.ai.type.ChatRole
 import io.github.drawjustin.kairos.common.error.KairosErrorCode
 import io.github.drawjustin.kairos.common.error.KairosException
 import java.time.Instant
@@ -57,14 +58,14 @@ class ClaudeProviderAdapter(
 
     private fun ChatCompletionRequest.toAnthropicRequest(): AnthropicMessageRequest {
         val systemPrompt = messages
-            .filter { it.role == "system" }
+            .filter { it.role == ChatRole.SYSTEM }
             .joinToString("\n\n") { it.content }
             .ifBlank { null }
         val conversationMessages = messages
-            .filterNot { it.role == "system" }
+            .filterNot { it.role == ChatRole.SYSTEM }
             .map {
                 AnthropicMessage(
-                    role = it.role,
+                    role = it.role.value,
                     content = it.content,
                 )
             }
@@ -92,7 +93,7 @@ class ClaudeProviderAdapter(
                 ChatChoiceResponse(
                     index = 0,
                     message = ChatMessageResponse(
-                        role = "assistant",
+                        role = ChatRole.ASSISTANT,
                         content = text,
                     ),
                     finishReason = stopReason,
