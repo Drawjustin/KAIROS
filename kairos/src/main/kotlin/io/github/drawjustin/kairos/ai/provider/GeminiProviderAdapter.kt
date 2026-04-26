@@ -1,5 +1,6 @@
 package io.github.drawjustin.kairos.ai.provider
 
+import com.fasterxml.jackson.databind.ObjectMapper
 import io.github.drawjustin.kairos.ai.config.GeminiProperties
 import io.github.drawjustin.kairos.ai.type.AiModel
 import io.github.drawjustin.kairos.ai.dto.ChatChoiceResponse
@@ -12,8 +13,15 @@ import io.github.drawjustin.kairos.ai.provider.gemini.GeminiContent
 import io.github.drawjustin.kairos.ai.provider.gemini.GeminiGenerateContentRequest
 import io.github.drawjustin.kairos.ai.provider.gemini.GeminiGenerateContentResponse
 import io.github.drawjustin.kairos.ai.provider.gemini.GeminiGenerationConfig
+import io.github.drawjustin.kairos.ai.provider.gemini.GeminiFunctionCall
+import io.github.drawjustin.kairos.ai.provider.gemini.GeminiFunctionDeclaration
+import io.github.drawjustin.kairos.ai.provider.gemini.GeminiFunctionParameterProperty
+import io.github.drawjustin.kairos.ai.provider.gemini.GeminiFunctionParameters
+import io.github.drawjustin.kairos.ai.provider.gemini.GeminiFunctionResponse
 import io.github.drawjustin.kairos.ai.provider.gemini.GeminiPart
+import io.github.drawjustin.kairos.ai.provider.gemini.GeminiTool
 import io.github.drawjustin.kairos.ai.provider.gemini.GeminiUsageMetadata
+import io.github.drawjustin.kairos.ai.service.AiToolExecutor
 import io.github.drawjustin.kairos.ai.tool.AiToolDefinition
 import io.github.drawjustin.kairos.ai.type.AiProvider
 import io.github.drawjustin.kairos.ai.type.ChatRole
@@ -30,6 +38,8 @@ import org.springframework.web.client.body
 class GeminiProviderAdapter(
     private val geminiProperties: GeminiProperties,
     restClientBuilder: RestClient.Builder,
+    private val aiToolExecutor: AiToolExecutor,
+    private val objectMapper: ObjectMapper,
 ) : ProviderAdapter {
     private val restClient = restClientBuilder.build()
 
@@ -42,17 +52,24 @@ class GeminiProviderAdapter(
         }
 
         return try {
-            val response = restClient.post()
-                .uri("${geminiProperties.baseUrl.trimEnd('/')}/v1beta/models/${request.model.value}:generateContent")
-                .header("x-goog-api-key", apiKey)
-                .contentType(MediaType.APPLICATION_JSON)
-                .accept(MediaType.APPLICATION_JSON)
-                .body(request.toGeminiRequest())
-                .retrieve()
-                .body<GeminiGenerateContentResponse>()
-                ?: throw KairosException(KairosErrorCode.AI_PROVIDER_ERROR)
-
-            response.toChatCompletionResponse(request.model.value)
+            val providerRequest = request.toProviderRequest(tools = tools)
+            val response = sendProviderRequest(apiKey = apiKey, model = request.model.value, request = providerRequest)
+            val pendingToolCalls = response.pendingToolCalls()
+            if (pendingToolCalls.isEmpty()) {
+                response.toChatCompletionResponse(request.model.value)
+            } else {
+                val modelContent = response.candidates.firstOrNull()?.content
+                    ?: throw KairosException(KairosErrorCode.AI_PROVIDER_ERROR)
+                val toolResultContent = GeminiContent(
+                    role = "function",
+                    parts = pendingToolCalls.map { it.toProviderToolResult(tools) },
+                )
+                sendProviderRequest(
+                    apiKey = apiKey,
+                    model = request.model.value,
+                    request = providerRequest.copy(contents = providerRequest.contents + modelContent + toolResultContent),
+                ).toChatCompletionResponse(request.model.value)
+            }
         } catch (exception: KairosException) {
             throw exception
         } catch (exception: Exception) {
@@ -60,7 +77,22 @@ class GeminiProviderAdapter(
         }
     }
 
-    private fun ChatCompletionRequest.toGeminiRequest(): GeminiGenerateContentRequest {
+    private fun sendProviderRequest(
+        apiKey: String,
+        model: String,
+        request: GeminiGenerateContentRequest,
+    ): GeminiGenerateContentResponse =
+        restClient.post()
+            .uri("${geminiProperties.baseUrl.trimEnd('/')}/v1beta/models/$model:generateContent")
+            .header("x-goog-api-key", apiKey)
+            .contentType(MediaType.APPLICATION_JSON)
+            .accept(MediaType.APPLICATION_JSON)
+            .body(request)
+            .retrieve()
+            .body<GeminiGenerateContentResponse>()
+            ?: throw KairosException(KairosErrorCode.AI_PROVIDER_ERROR)
+
+    private fun ChatCompletionRequest.toProviderRequest(tools: List<AiToolDefinition>): GeminiGenerateContentRequest {
         val systemPrompt = messages
             .filter { it.role == ChatRole.SYSTEM }
             .joinToString("\n\n") { it.content }
@@ -82,6 +114,47 @@ class GeminiProviderAdapter(
             generationConfig = GeminiGenerationConfig(
                 temperature = temperature,
                 maxOutputTokens = maxTokens,
+            ),
+            tools = tools.toProviderTools().takeIf { it.isNotEmpty() },
+        )
+    }
+
+    private fun List<AiToolDefinition>.toProviderTools(): List<GeminiTool> =
+        listOf(
+            GeminiTool(
+                functionDeclarations = map {
+                    GeminiFunctionDeclaration(
+                        name = it.name,
+                        description = it.description,
+                        parameters = GeminiFunctionParameters(
+                            type = it.parameters.type.uppercase(),
+                            properties = it.parameters.properties.mapValues { property ->
+                                GeminiFunctionParameterProperty(
+                                    type = property.value.type.uppercase(),
+                                    description = property.value.description,
+                                )
+                            },
+                            required = it.parameters.required,
+                        ),
+                    )
+                },
+            ),
+        )
+
+    private fun GeminiGenerateContentResponse.pendingToolCalls(): List<GeminiFunctionCall> =
+        candidates.firstOrNull()?.content?.parts.orEmpty().mapNotNull { it.functionCall }
+
+    private fun GeminiFunctionCall.toProviderToolResult(tools: List<AiToolDefinition>): GeminiPart {
+        val tool = tools.firstOrNull { it.name == name }
+            ?: throw KairosException(KairosErrorCode.AI_TOOL_NOT_ALLOWED)
+        val result = aiToolExecutor.execute(
+            tool = tool,
+            arguments = objectMapper.writeValueAsString(args),
+        )
+        return GeminiPart(
+            functionResponse = GeminiFunctionResponse(
+                name = name,
+                response = mapOf("result" to result),
             ),
         )
     }
@@ -107,7 +180,7 @@ class GeminiProviderAdapter(
             index = index ?: 0,
             message = ChatMessageResponse(
                 role = ChatRole.ASSISTANT,
-                content = content?.parts.orEmpty().joinToString("") { it.text },
+                content = content?.parts.orEmpty().joinToString("") { it.text.orEmpty() },
             ),
             finishReason = finishReason,
         )

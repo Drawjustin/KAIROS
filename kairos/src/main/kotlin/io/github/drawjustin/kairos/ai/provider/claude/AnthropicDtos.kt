@@ -1,6 +1,7 @@
 package io.github.drawjustin.kairos.ai.provider.claude
 
 import com.fasterxml.jackson.annotation.JsonProperty
+import io.github.drawjustin.kairos.ai.tool.AiToolParameters
 
 data class AnthropicMessageRequest(
     val model: String,
@@ -9,11 +10,19 @@ data class AnthropicMessageRequest(
     val messages: List<AnthropicMessage>,
     val system: String? = null,
     val temperature: Double? = null,
+    val tools: List<AnthropicTool>? = null,
 )
 
 data class AnthropicMessage(
     val role: String,
-    val content: String,
+    val content: Any,
+)
+
+data class AnthropicTool(
+    val name: String,
+    val description: String,
+    @JsonProperty("input_schema")
+    val inputSchema: AiToolParameters,
 )
 
 data class AnthropicMessageResponse(
@@ -30,6 +39,9 @@ data class AnthropicMessageResponse(
 data class AnthropicContentBlock(
     val type: String,
     val text: String? = null,
+    val id: String? = null,
+    val name: String? = null,
+    val input: Map<String, Any?>? = null,
 )
 
 data class AnthropicUsage(

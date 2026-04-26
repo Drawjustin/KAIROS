@@ -1,5 +1,6 @@
 package io.github.drawjustin.kairos.ai.provider
 
+import com.fasterxml.jackson.databind.ObjectMapper
 import io.github.drawjustin.kairos.ai.config.AnthropicProperties
 import io.github.drawjustin.kairos.ai.type.AiModel
 import io.github.drawjustin.kairos.ai.dto.ChatChoiceResponse
@@ -10,6 +11,8 @@ import io.github.drawjustin.kairos.ai.dto.ChatUsageResponse
 import io.github.drawjustin.kairos.ai.provider.claude.AnthropicMessage
 import io.github.drawjustin.kairos.ai.provider.claude.AnthropicMessageRequest
 import io.github.drawjustin.kairos.ai.provider.claude.AnthropicMessageResponse
+import io.github.drawjustin.kairos.ai.provider.claude.AnthropicTool
+import io.github.drawjustin.kairos.ai.service.AiToolExecutor
 import io.github.drawjustin.kairos.ai.tool.AiToolDefinition
 import io.github.drawjustin.kairos.ai.type.AiProvider
 import io.github.drawjustin.kairos.ai.type.ChatRole
@@ -26,6 +29,8 @@ import org.springframework.web.client.body
 class ClaudeProviderAdapter(
     private val anthropicProperties: AnthropicProperties,
     restClientBuilder: RestClient.Builder,
+    private val aiToolExecutor: AiToolExecutor,
+    private val objectMapper: ObjectMapper,
 ) : ProviderAdapter {
     private val restClient = restClientBuilder.build()
 
@@ -38,18 +43,29 @@ class ClaudeProviderAdapter(
         }
 
         return try {
-            val response = restClient.post()
-                .uri("${anthropicProperties.baseUrl.trimEnd('/')}/v1/messages")
-                .header("x-api-key", apiKey)
-                .header("anthropic-version", anthropicProperties.version)
-                .contentType(MediaType.APPLICATION_JSON)
-                .accept(MediaType.APPLICATION_JSON)
-                .body(request.toAnthropicRequest())
-                .retrieve()
-                .body<AnthropicMessageResponse>()
-                ?: throw KairosException(KairosErrorCode.AI_PROVIDER_ERROR)
-
-            response.toChatCompletionResponse()
+            val providerRequest = request.toProviderRequest(tools = tools)
+            val response = sendProviderRequest(apiKey = apiKey, request = providerRequest)
+            val pendingToolCalls = response.pendingToolCalls()
+            if (pendingToolCalls.isEmpty()) {
+                response.toChatCompletionResponse()
+            } else {
+                val followUpMessages = providerRequest.messages +
+                    AnthropicMessage(role = ChatRole.ASSISTANT.value, content = response.content) +
+                    AnthropicMessage(
+                        role = ChatRole.USER.value,
+                        content = pendingToolCalls.map { toolCall ->
+                            mapOf(
+                                "type" to "tool_result",
+                                "tool_use_id" to toolCall.id,
+                                "content" to toolCall.executeTool(tools),
+                            )
+                        },
+                    )
+                sendProviderRequest(
+                    apiKey = apiKey,
+                    request = providerRequest.copy(messages = followUpMessages),
+                ).toChatCompletionResponse()
+            }
         } catch (exception: KairosException) {
             throw exception
         } catch (exception: Exception) {
@@ -57,7 +73,19 @@ class ClaudeProviderAdapter(
         }
     }
 
-    private fun ChatCompletionRequest.toAnthropicRequest(): AnthropicMessageRequest {
+    private fun sendProviderRequest(apiKey: String, request: AnthropicMessageRequest): AnthropicMessageResponse =
+        restClient.post()
+            .uri("${anthropicProperties.baseUrl.trimEnd('/')}/v1/messages")
+            .header("x-api-key", apiKey)
+            .header("anthropic-version", anthropicProperties.version)
+            .contentType(MediaType.APPLICATION_JSON)
+            .accept(MediaType.APPLICATION_JSON)
+            .body(request)
+            .retrieve()
+            .body<AnthropicMessageResponse>()
+            ?: throw KairosException(KairosErrorCode.AI_PROVIDER_ERROR)
+
+    private fun ChatCompletionRequest.toProviderRequest(tools: List<AiToolDefinition>): AnthropicMessageRequest {
         val systemPrompt = messages
             .filter { it.role == ChatRole.SYSTEM }
             .joinToString("\n\n") { it.content }
@@ -77,6 +105,30 @@ class ClaudeProviderAdapter(
             messages = conversationMessages,
             system = systemPrompt,
             temperature = temperature,
+            tools = tools.toProviderTools().takeIf { it.isNotEmpty() },
+        )
+    }
+
+    private fun List<AiToolDefinition>.toProviderTools(): List<AnthropicTool> =
+        map {
+            AnthropicTool(
+                name = it.name,
+                description = it.description,
+                inputSchema = it.parameters,
+            )
+        }
+
+    private fun AnthropicMessageResponse.pendingToolCalls() =
+        content.filter { it.type == "tool_use" }
+
+    private fun io.github.drawjustin.kairos.ai.provider.claude.AnthropicContentBlock.executeTool(
+        tools: List<AiToolDefinition>,
+    ): String {
+        val tool = tools.firstOrNull { it.name == name }
+            ?: throw KairosException(KairosErrorCode.AI_TOOL_NOT_ALLOWED)
+        return aiToolExecutor.execute(
+            tool = tool,
+            arguments = objectMapper.writeValueAsString(input.orEmpty()),
         )
     }
 
