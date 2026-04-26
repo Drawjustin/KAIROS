@@ -1,224 +1,176 @@
-# Kairos
+# KAIROS
 
-Spring Boot + Kotlin 기반의 JWT 인증 API 프로젝트입니다.
+> Enterprise AI Gateway and Operations Platform
 
-현재는 인증 흐름과 공통 백엔드 기반 작업을 먼저 정리한 상태입니다.
+KAIROS는 기업 내부에서 AI를 더 안전하고, 일관되게, 운영 가능하게 만들기 위한 백엔드 플랫폼입니다.
 
-## Tech Stack
+단순히 여러 LLM API를 중계하는 프록시가 아니라,  
+인증과 권한, 모델 라우팅, 비용 통제, 장애 대응, 관측 가능성, 그리고 내부 문서·도구·시스템 연결까지 하나의 계층에서 관리하는 **Enterprise AI Gateway**를 목표로 합니다.
 
-- Java 21
-- Kotlin 1.9.25
-- Spring Boot 3.5.13
-- Spring Security
-- Spring Data JPA
-- PostgreSQL
-- Flyway
-- Testcontainers
-- springdoc-openapi / Swagger UI
+즉, KAIROS는 "모델을 대신 호출해주는 서버"가 아니라  
+**조직이 AI를 실제 업무와 서비스에 도입할 때 필요한 운영 문제를 해결하는 플랫폼**입니다.
 
-## Current Status
+## 아키텍처 개요
 
-현재 구현/정리된 항목:
+```mermaid
+flowchart LR
+    A["Client Apps<br/>Web / Backend / Internal Tools"] --> B["KAIROS"]
 
-- JWT 기반 인증
-  - 회원가입
-  - 로그인
-  - access token / refresh token 발급
-  - refresh rotation
-  - refresh token 재사용 탐지
-  - 로그아웃 시 refresh session 폐기
-- 공통 응답 / 에러 포맷
-  - 성공 응답은 `result`
-  - 에러 응답은 `errorCode`, `errorMessage`
-- 공통 예외 처리
-  - `KairosException`
-  - `KairosErrorCode`
-  - `GlobalExceptionHandler`
-- 로깅 / 추적
-  - 요청 단위 `traceId`
-  - 응답 헤더 `X-Trace-Id`
-  - 요청 완료 로그
-  - 예외 로그 공통화
-- Slack 에러 알림
-  - 지정된 중요 에러만 Slack webhook 전송
-- JPA 공통 기반
-  - `BaseEntity`
-  - `createdAt`, `updatedAt`, `deletedAt`
-  - JPA Auditing 활성화
-- Soft delete 정책
-  - `deleted_at` 기반 soft delete
-  - 기본 조회 시 deleted row 제외
-  - 활성 사용자만 email unique
-- 보안 설정 정리
-  - `open-in-view=false`
-  - Spring Security 기본 generated password 제거
-- Swagger / OpenAPI 연동
-  - Swagger UI 접근 가능
-  - Bearer JWT 인증 스킴 설정
+    B --> C["Unified Chat API<br/>/api/v1/chat/completions"]
+    B --> D["Platform API<br/>Tenant / Project / API Key"]
 
-## API Summary
+    C --> E["API Key Authentication"]
+    C --> F["Unified AI Service"]
+    F --> G["Provider Router"]
+    G --> H["OpenAI Adapter"]
+    G --> I["Claude Adapter"]
+    G --> J["Gemini Adapter"]
+    H --> K["OpenAI Chat API"]
+    I --> L["Claude Messages API"]
+    J --> M["Gemini Generate Content API"]
 
-인증 API:
+    F --> N["Usage Logging"]
+    N --> O["Usage Summary API"]
 
-- `POST /api/auth/register`
-- `POST /api/auth/login`
-- `POST /api/auth/refresh`
-- `POST /api/auth/logout`
-- `GET /api/auth/me`
+    D --> P["Tenant"]
+    D --> Q["Project"]
+    D --> R["Tenant User"]
+    D --> S["API Key"]
 
-## Response Shape
+    B --> T["Internal Context Extension"]
+    T --> U["Docs / Wiki"]
+    T --> V["Internal Tools"]
+    T --> W["MCP Servers"]
 
-성공 응답 예시:
-
-```json
-{
-  "result": {
-    "accessToken": "...",
-    "refreshToken": "...",
-    "tokenType": "Bearer"
-  }
-}
+    P --> X["Policy Boundary"]
+    Q --> X
+    R --> X
+    S --> X
 ```
 
-에러 응답 예시:
+현재 범위에서는 **Unified Chat API 연결**, **OpenAI / Claude / Gemini 연동**, **API key 인증**, **tenant / project 기반 운영 경계**, **Provider Router / Adapter**, **AI 사용량 로깅과 tenant/project 단위 사용량 집계 API**까지를 먼저 구현합니다.  
+이후 필요에 따라 내부 문서 검색, Tool Calling, MCP 기반 확장으로 자연스럽게 이어질 수 있도록 구조를 잡고 있습니다.
 
-```json
-{
-  "errorCode": "AUTH_003",
-  "errorMessage": "Invalid refresh token"
-}
-```
+## 현재 구현된 범위
 
-추적용 `traceId`는 body가 아니라 응답 헤더 `X-Trace-Id`로 제공합니다.
+- JWT 기반 회원가입, 로그인, refresh token 인증 흐름
+- ADMIN 전용 tenant 생성 및 전체 tenant 목록 조회 API
+- tenant user 기반 OWNER/ADMIN/MEMBER 역할 관리
+- tenant 아래 project 생성 및 목록 조회
+- project 단위 API key 발급, 목록 조회, 만료/폐기 상태 검증
+- `/api/v1/chat/completions` 단일 Unified Chat API
+- OpenAI, Claude, Gemini provider adapter와 model 기반 router
+- API key 기반 AI 호출 인증
+- 성공/실패 AI 사용량 로그 저장
+- QueryDSL 기반 tenant/project 사용량 요약, project별 breakdown, provider/model별 breakdown 조회
+- project별 허용 모델 정책 관리와 AI 호출 차단
+- Flyway 기반 PostgreSQL 스키마 관리
+- Swagger 문서화, traceId 기반 요청 로그, Testcontainers 통합 테스트
 
-## JWT / Refresh Policy
+## 왜 KAIROS가 필요한가
 
-- access token은 짧은 수명의 stateless 토큰입니다.
-- refresh token은 DB의 `refresh_sessions`와 함께 관리합니다.
-- refresh 요청 시 refresh rotation을 수행합니다.
-- 이미 폐기된 refresh token 재사용이 감지되면 사용자 활성 세션을 모두 revoke합니다.
+AI 기능을 서비스나 사내 업무에 붙이기 시작하면 금방 이런 문제가 생깁니다.
 
-## Soft Delete Policy
+- 팀마다 선호하는 AI API 형식이 다릅니다.
+- 모델 제공자마다 요청 방식, 가격, 장애 특성이 다릅니다.
+- 어떤 팀이 어떤 모델을 얼마나 쓰는지 파악하기 어렵습니다.
+- 비용, 에러율, 응답시간을 중앙에서 관리하기 어렵습니다.
+- 특정 provider 장애가 여러 서비스에 동시에 영향을 줄 수 있습니다.
+- quota, rate limit, budget 같은 운영 정책이 필요합니다.
+- 사내 AI는 문서, 위키, 코드, 운영 도구 같은 내부 컨텍스트에 안전하게 접근해야 합니다.
 
-- `users`, `refresh_sessions`는 soft delete를 사용합니다.
-- 삭제 시 실제 `DELETE` 대신 `deleted_at`이 기록됩니다.
-- 기본 조회에서는 `deleted_at is null` 데이터만 조회합니다.
-- `users.email`은 활성 사용자끼리만 unique합니다.
-- 추후 purge job으로 오래된 soft deleted row를 hard delete 할 수 있습니다.
+KAIROS는 이런 문제를 "모델 호출"이 아니라  
+**모델 위의 운영 계층**을 표준화하는 방식으로 해결하려고 합니다.
 
-## Logging / Trace
+## KAIROS가 지향하는 것
 
-- 모든 응답 헤더에 `X-Trace-Id`를 포함합니다.
-- 예외 발생 시 서버 로그에서 같은 `traceId`로 검색할 수 있습니다.
-- 콘솔 로그 패턴에 MDC traceId가 포함되어 있습니다.
+KAIROS는 다음을 중앙에서 다루는 플랫폼을 지향합니다.
 
-## Swagger
+- 여러 AI provider를 공통 실행 계층으로 추상화
+- tenant, project 단위 인증과 권한 관리
+- API key 기반 호출 통제
+- 모델 라우팅, fallback, retry 같은 장애 대응
+- 사용량, 비용, 에러율, 지연시간 추적
+- quota, rate limit, budget 정책 적용
+- 내부 문서와 도구 연결을 위한 확장 지점 제공
+- 향후 RAG, Tool Calling, MCP 통합까지 이어질 수 있는 구조
 
-로컬 실행 후 접근:
+한마디로 정리하면:
 
-- `http://localhost:8080/swagger-ui/index.html`
-- `http://localhost:8080/v3/api-docs`
+> KAIROS는 기업이 AI를 "호출"하는 것을 넘어서,  
+> **통제하고, 추적하고, 운영할 수 있게 만드는 플랫폼**입니다.
 
-설정 요약:
+## 어떤 환경에 잘 맞는가
 
-- `springdoc-openapi-starter-webmvc-ui` 사용
-- `/swagger-ui/**`, `/v3/api-docs/**`는 security에서 `permitAll`
-- Bearer JWT 인증 스킴 등록
+KAIROS는 특히 이런 환경에 잘 맞습니다.
 
-운영에서는 Swagger 비활성화를 권장합니다.
+- 여러 팀이 공통 AI 인프라를 함께 써야 하는 조직
+- AI 사용량과 비용을 중앙에서 관리해야 하는 환경
+- 특정 모델에 종속되지 않고 운영 유연성을 확보하고 싶은 경우
+- 내부 문서, 사내 시스템, 운영 도구를 AI와 연결하려는 경우
+- 향후 MCP, Tool Calling, RAG 같은 구조까지 확장하려는 경우
 
-예시:
+작은 서비스에서 단일 모델만 빠르게 붙이는 용도라면 과할 수 있습니다.  
+하지만 여러 팀, 여러 기능, 여러 정책이 엮이기 시작하면 KAIROS 같은 운영 계층의 필요성이 분명해집니다.
 
-```yaml
-springdoc:
-  api-docs:
-    enabled: false
-  swagger-ui:
-    enabled: false
-```
+## 핵심 개념
 
-## Package Structure
+### Tenant
 
-현재 구조는 상위는 기능별, 하위는 역할별로 나뉘어 있습니다.
+조직 경계입니다.  
+부서, 팀, 본부, 워크스페이스처럼 정책과 비용을 함께 관리할 수 있는 단위로 사용할 수 있습니다.
 
-- `auth`
-  - `config`
-  - `controller`
-  - `domain`
-  - `dto`
-  - `repository`
-  - `security`
-  - `service`
-- `user`
-  - `controller`
-  - `entity`
-  - `repository`
-  - `service`
-- `common`
-  - `api`
-  - `error`
-  - `logging`
-  - `persistence`
-  - `slack`
+### Project
 
-## Local Run
+실제 AI 기능 단위입니다.  
+예를 들면 사내 문서 검색, 고객 응대 봇, 코드 리뷰 도우미, 장애 분석 보조 도구 같은 개별 서비스를 의미합니다.
 
-기본 프로필은 `local`입니다.
+### Tenant User
 
-주요 환경변수:
+tenant에 속한 사용자와 역할을 정의합니다.  
+이를 통해 누가 어떤 tenant와 project를 운영할 수 있는지 통제할 수 있습니다.
 
-- `KAIROS_API_DB_URL`
-- `KAIROS_API_DB_USERNAME`
-- `KAIROS_API_DB_PASSWORD`
-- `KAIROS_JWT_SECRET`
-- `KAIROS_JWT_ISSUER` (optional, default: `kairos`)
-- `KAIROS_JWT_ACCESS_TOKEN_EXPIRATION` (optional, default: `15m`)
-- `KAIROS_JWT_REFRESH_TOKEN_EXPIRATION` (optional, default: `30d`)
-- `SLACK_WEBHOOK_URL` (optional)
+### API Key
 
-예시:
+project 단위 호출 자격 증명입니다.  
+AI API 호출을 project 단위로 분리하고, 사용량과 비용을 추적하며, 정책을 적용하는 기준점이 됩니다.
 
-```bash
-./gradlew bootRun
-```
+## KAIROS의 포지션
 
-## Test
+KAIROS는 단순한 멀티 LLM 프록시가 아닙니다.
 
-인증 통합 테스트는 다음을 검증합니다.
+KAIROS가 진짜로 풀고 싶은 문제는 다음과 같습니다.
 
-- 회원가입 / 로그인 / 내 정보 조회
-- refresh rotation
-- logout 후 refresh 차단
-- 입력 검증
-- soft deleted user 로그인 차단
-- soft delete 후 동일 이메일 재가입 허용
-- soft deleted refresh session 차단
+- AI 모델 접근을 어떻게 통제할 것인가
+- 내부 컨텍스트 접근을 어떻게 안전하게 열어줄 것인가
+- 어떤 팀이 어떤 정책 아래 어떤 AI 기능을 쓰는지 어떻게 관리할 것인가
+- 비용과 장애를 어떻게 운영 관점에서 다룰 것인가
 
-실행 예시:
+그래서 KAIROS는 다음 세 가지를 함께 묶는 방향을 지향합니다.
 
-```bash
-./gradlew test --tests io.github.drawjustin.kairos.auth.AuthIntegrationTests
-```
+- **AI Gateway**
+- **운영 정책 플랫폼**
+- **사내 AI 실행 기반**
 
-## Important Design Decisions
+## 앞으로의 방향
 
-- `open-in-view=false`
-  - 서비스 계층 안에서 필요한 데이터를 모두 조회하고 DTO로 변환합니다.
-- traceId는 헤더 전용
-  - 클라이언트는 `X-Trace-Id`를 서버 담당자에게 전달하면 됩니다.
-- `UserRole`은 enum 사용
-  - 문자열 하드코딩 대신 타입 안전성 확보
-- Swagger 취약점 대응
-  - `commons-lang3`는 `3.18.0`으로 명시 고정
+가까운 단계에서는 다음을 우선 만듭니다.
 
-## Next Priorities
+1. API key별 rate limit, quota, budget 정책
+2. provider timeout, retry, fallback 정책
+3. 내부 문서 검색과 MCP 기반 context provider
+4. 운영 대시보드와 사용량 시각화
+5. project별 문서/도구 접근 scope 정책
 
-현재 남은 우선순위:
+그다음 단계에서는 아래로 확장할 수 있습니다.
 
-1. 전체 빌드 / 테스트 실제 검증
-2. Swagger 문서 예시값 / 설명 보강
-3. 운영용 설정 분리
-   - prod에서 Swagger 비활성화
-   - Slack / logging 수준 점검
-4. soft delete purge 전략 구체화
-5. 관리자 기능 또는 권한 확장 설계
+- RAG 연동
+- Tool Calling
+- MCP 기반 내부 도구 연결
+- 정책 엔진 고도화
+- Budget / Quota 자동화
+- 대시보드와 운영 콘솔
+
+## 한 줄 소개
+
+**KAIROS는 기업이 외부 AI 모델을 쓰더라도, 내부 정책과 운영 통제를 유지한 채 AI를 서비스와 업무에 연결할 수 있게 만드는 Enterprise AI Gateway입니다.**
