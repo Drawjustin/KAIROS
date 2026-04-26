@@ -8,6 +8,7 @@ import io.github.drawjustin.kairos.ai.dto.ChatCompletionRequest
 import io.github.drawjustin.kairos.ai.dto.ChatCompletionResponse
 import io.github.drawjustin.kairos.ai.dto.ChatMessageResponse
 import io.github.drawjustin.kairos.ai.dto.ChatUsageResponse
+import io.github.drawjustin.kairos.ai.provider.claude.AnthropicContentBlock
 import io.github.drawjustin.kairos.ai.provider.claude.AnthropicMessage
 import io.github.drawjustin.kairos.ai.provider.claude.AnthropicMessageRequest
 import io.github.drawjustin.kairos.ai.provider.claude.AnthropicMessageResponse
@@ -50,7 +51,10 @@ class ClaudeProviderAdapter(
                 response.toChatCompletionResponse()
             } else {
                 val followUpMessages = providerRequest.messages +
-                    AnthropicMessage(role = ChatRole.ASSISTANT.value, content = response.content) +
+                    AnthropicMessage(
+                        role = ChatRole.ASSISTANT.value,
+                        content = pendingToolCalls.map { it.toProviderToolCallBlock() },
+                    ) +
                     AnthropicMessage(
                         role = ChatRole.USER.value,
                         content = pendingToolCalls.map { toolCall ->
@@ -121,7 +125,15 @@ class ClaudeProviderAdapter(
     private fun AnthropicMessageResponse.pendingToolCalls() =
         content.filter { it.type == "tool_use" }
 
-    private fun io.github.drawjustin.kairos.ai.provider.claude.AnthropicContentBlock.executeTool(
+    private fun AnthropicContentBlock.toProviderToolCallBlock(): Map<String, Any> =
+        mapOf(
+            "type" to "tool_use",
+            "id" to requireNotNull(id) { "Claude tool_use id must exist" },
+            "name" to requireNotNull(name) { "Claude tool_use name must exist" },
+            "input" to input.orEmpty(),
+        )
+
+    private fun AnthropicContentBlock.executeTool(
         tools: List<AiToolDefinition>,
     ): String {
         val tool = tools.firstOrNull { it.name == name }
