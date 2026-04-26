@@ -38,6 +38,8 @@ class SecurityConfig(
                     "/swagger-ui/**",
                     "/v3/api-docs/**",
                 ).permitAll()
+                    // MVP 내부 tool endpoint다. 운영에서는 외부 공개 없이 내부망/게이트웨이에서만 접근하게 제한해야 한다.
+                    .requestMatchers("/internal/tools/**").permitAll()
                     .requestMatchers("/error").permitAll()
                     .anyRequest().authenticated()
             }
