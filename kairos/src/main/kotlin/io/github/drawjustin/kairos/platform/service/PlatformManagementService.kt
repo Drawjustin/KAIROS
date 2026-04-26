@@ -1,16 +1,22 @@
 package io.github.drawjustin.kairos.platform.service
 
-import io.github.drawjustin.kairos.ai.type.AiModel
 import io.github.drawjustin.kairos.ai.service.AiUsageService
+import io.github.drawjustin.kairos.ai.type.AiModel
 import io.github.drawjustin.kairos.apikey.entity.ApiKey
 import io.github.drawjustin.kairos.apikey.repository.ApiKeyRepository
 import io.github.drawjustin.kairos.auth.security.AuthenticatedUser
 import io.github.drawjustin.kairos.auth.service.TokenHasher
 import io.github.drawjustin.kairos.common.error.KairosErrorCode
 import io.github.drawjustin.kairos.common.error.KairosException
+import io.github.drawjustin.kairos.context.entity.ContextSource
+import io.github.drawjustin.kairos.context.entity.ProjectContextSource
+import io.github.drawjustin.kairos.context.repository.ContextSourceRepository
+import io.github.drawjustin.kairos.context.repository.ProjectContextSourceRepository
 import io.github.drawjustin.kairos.platform.dto.ApiKeyIssueOutput
 import io.github.drawjustin.kairos.platform.dto.ApiKeyOutput
+import io.github.drawjustin.kairos.platform.dto.ContextSourceOutput
 import io.github.drawjustin.kairos.platform.dto.CreateApiKeyRequest
+import io.github.drawjustin.kairos.platform.dto.CreateProjectContextSourceRequest
 import io.github.drawjustin.kairos.platform.dto.CreateProjectRequest
 import io.github.drawjustin.kairos.platform.dto.CreateTenantRequest
 import io.github.drawjustin.kairos.platform.dto.CreateTenantUserRequest
@@ -49,6 +55,8 @@ class PlatformManagementService(
     private val tenantUserRepository: TenantUserRepository,
     private val projectRepository: ProjectRepository,
     private val projectAllowedModelRepository: ProjectAllowedModelRepository,
+    private val contextSourceRepository: ContextSourceRepository,
+    private val projectContextSourceRepository: ProjectContextSourceRepository,
     private val apiKeyRepository: ApiKeyRepository,
     private val aiUsageService: AiUsageService,
     private val userRepository: UserRepository,
@@ -229,6 +237,68 @@ class PlatformManagementService(
         )
     }
 
+    @Transactional(readOnly = true)
+    fun listProjectContextSources(principal: AuthenticatedUser, projectId: Long): List<ContextSourceOutput> {
+        val project = resolveManagedProject(principal, projectId)
+        val resolvedProjectId = requireNotNull(project.id) { "Project id must exist" }
+        return projectContextSourceRepository.findAllByProject_IdAndDeletedAtIsNullOrderByCreatedAtAsc(resolvedProjectId)
+            .map { it.contextSource.toOutput() }
+    }
+
+    @Transactional
+    fun createProjectContextSource(
+        principal: AuthenticatedUser,
+        projectId: Long,
+        request: CreateProjectContextSourceRequest,
+    ): ContextSourceOutput {
+        val project = resolveManagedProject(principal, projectId)
+        val resolvedProjectId = requireNotNull(project.id) { "Project id must exist" }
+        val name = request.name.trim()
+        val existingContextSource = contextSourceRepository.findByNameIgnoreCaseAndDeletedAtIsNull(name).orElse(null)
+        if (existingContextSource != null) {
+            val contextSourceId = requireNotNull(existingContextSource.id) { "ContextSource id must exist" }
+            if (projectContextSourceRepository.existsByProject_IdAndContextSource_IdAndDeletedAtIsNull(resolvedProjectId, contextSourceId)) {
+                throw KairosException(KairosErrorCode.CONTEXT_SOURCE_ALREADY_LINKED)
+            }
+            projectContextSourceRepository.save(
+                ProjectContextSource(
+                    project = project,
+                    contextSource = existingContextSource,
+                ),
+            )
+            return existingContextSource.toOutput()
+        }
+        validateContextSourcePayload(request)
+
+        val contextSource = contextSourceRepository.save(
+            ContextSource(
+                type = request.type,
+                name = name,
+                description = request.description?.trimToNull(),
+                uri = request.uri?.trimToNull(),
+            ),
+        )
+        projectContextSourceRepository.save(
+            ProjectContextSource(
+                project = project,
+                contextSource = contextSource,
+            ),
+        )
+
+        return contextSource.toOutput()
+    }
+
+    @Transactional
+    fun deleteProjectContextSource(principal: AuthenticatedUser, projectId: Long, contextSourceId: Long) {
+        val project = resolveManagedProject(principal, projectId)
+        val resolvedProjectId = requireNotNull(project.id) { "Project id must exist" }
+        val projectContextSource = projectContextSourceRepository
+            .findByProject_IdAndContextSource_IdAndDeletedAtIsNull(resolvedProjectId, contextSourceId)
+            .orElseThrow { KairosException(KairosErrorCode.CONTEXT_SOURCE_NOT_FOUND) }
+
+        projectContextSourceRepository.delete(projectContextSource)
+    }
+
     @Transactional
     fun createApiKey(
         principal: AuthenticatedUser,
@@ -389,6 +459,25 @@ class PlatformManagementService(
         revokedAt = revokedAt,
         createdAt = requireNotNull(createdAt) { "ApiKey createdAt must exist" },
     )
+
+    private fun ContextSource.toOutput(): ContextSourceOutput = ContextSourceOutput(
+        id = requireNotNull(id) { "ContextSource id must exist" },
+        type = type,
+        name = name,
+        description = description,
+        uri = uri,
+        status = status,
+        createdAt = requireNotNull(createdAt) { "ContextSource createdAt must exist" },
+    )
+
+    private fun validateContextSourcePayload(request: CreateProjectContextSourceRequest) {
+        val hasUri = !request.uri.isNullOrBlank()
+        if (!hasUri) {
+            throw KairosException(KairosErrorCode.CONTEXT_SOURCE_INVALID_PAYLOAD)
+        }
+    }
+
+    private fun String.trimToNull(): String? = trim().takeIf { it.isNotBlank() }
 
     private fun saveAllowedModels(project: Project, models: Collection<AiModel>) {
         projectAllowedModelRepository.saveAll(

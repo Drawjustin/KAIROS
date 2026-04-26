@@ -92,7 +92,7 @@ class UnifiedAiIntegrationTests : IntegrationTestSupport() {
     fun setUp() {
         // soft delete된 row까지 포함해 초기 상태를 맞춰 API key 인증 테스트가 흔들리지 않게 한다.
         jdbcTemplate.execute(
-            "truncate table ai_usage_log, api_key, project_allowed_model, project, tenant_user, tenant, refresh_session, users restart identity cascade",
+            "truncate table ai_usage_log, api_key, project_context_source, context_source, project_allowed_model, project, tenant_user, tenant, refresh_session, users restart identity cascade",
         )
         providerAdapter = mock(ProviderAdapter::class.java)
     }

@@ -13,9 +13,13 @@ import io.github.drawjustin.kairos.auth.dto.LoginRequest
 import io.github.drawjustin.kairos.auth.dto.RegisterRequest
 import io.github.drawjustin.kairos.auth.repository.RefreshSessionRepository
 import io.github.drawjustin.kairos.common.api.BaseOutput
+import io.github.drawjustin.kairos.context.type.ContextSourceType
 import io.github.drawjustin.kairos.platform.dto.ApiKeyIssueResponse
 import io.github.drawjustin.kairos.platform.dto.ApiKeysResponse
+import io.github.drawjustin.kairos.platform.dto.ContextSourceResponse
+import io.github.drawjustin.kairos.platform.dto.ContextSourcesResponse
 import io.github.drawjustin.kairos.platform.dto.CreateApiKeyRequest
+import io.github.drawjustin.kairos.platform.dto.CreateProjectContextSourceRequest
 import io.github.drawjustin.kairos.platform.dto.CreateProjectRequest
 import io.github.drawjustin.kairos.platform.dto.CreateTenantRequest
 import io.github.drawjustin.kairos.platform.dto.CreateTenantUserRequest
@@ -96,7 +100,7 @@ class PlatformManagementIntegrationTests : IntegrationTestSupport() {
     fun setUp() {
         // soft delete된 row까지 포함해 완전히 비워야 다음 테스트의 FK와 unique 제약이 흔들리지 않는다.
         jdbcTemplate.execute(
-            "truncate table ai_usage_log, api_key, project_allowed_model, project, tenant_user, tenant, refresh_session, users restart identity cascade",
+            "truncate table ai_usage_log, api_key, project_context_source, context_source, project_allowed_model, project, tenant_user, tenant, refresh_session, users restart identity cascade",
         )
     }
 
@@ -203,6 +207,68 @@ class PlatformManagementIntegrationTests : IntegrationTestSupport() {
 
         val reloaded = getProjectAllowedModels(adminLogin.accessToken, project.id)
         assertThat(reloaded.models).containsExactlyInAnyOrder(AiModel.GPT_4O_MINI, AiModel.GEMINI_2_5_FLASH)
+    }
+
+    @Test
+    fun `tenant manager can create list and unlink project context sources`() {
+        register(RegisterRequest(email = "context-admin@example.com", password = "password123"))
+        val adminUser = userRepository.findByEmailAndDeletedAtIsNull("context-admin@example.com").orElseThrow()
+        adminUser.role = UserRole.ADMIN
+        userRepository.save(adminUser)
+        val adminLogin = login(LoginRequest(email = "context-admin@example.com", password = "password123"))
+        val tenant = createTenant(adminLogin.accessToken, CreateTenantRequest(name = "context-team"))
+        val project = createProject(adminLogin.accessToken, tenant.id, CreateProjectRequest(name = "context-project"))
+
+        val created = createProjectContextSource(
+            adminLogin.accessToken,
+            project.id,
+            CreateProjectContextSourceRequest(
+                name = "hr-policy-manual",
+                type = ContextSourceType.DOCUMENT,
+                description = "인사 정책 매뉴얼",
+                uri = "https://wiki.example.com/hr-policy",
+            ),
+        )
+        assertThat(created.name).isEqualTo("hr-policy-manual")
+        assertThat(created.type).isEqualTo(ContextSourceType.DOCUMENT)
+        assertThat(created.uri).isEqualTo("https://wiki.example.com/hr-policy")
+
+        val listed = listProjectContextSources(adminLogin.accessToken, project.id)
+        assertThat(listed).hasSize(1)
+        assertThat(listed.single().id).isEqualTo(created.id)
+
+        deleteProjectContextSource(adminLogin.accessToken, project.id, created.id)
+        assertThat(listProjectContextSources(adminLogin.accessToken, project.id)).isEmpty()
+    }
+
+    @Test
+    fun `project context source validates required payload by type`() {
+        register(RegisterRequest(email = "context-validation-admin@example.com", password = "password123"))
+        val adminUser = userRepository.findByEmailAndDeletedAtIsNull("context-validation-admin@example.com").orElseThrow()
+        adminUser.role = UserRole.ADMIN
+        userRepository.save(adminUser)
+        val adminLogin = login(LoginRequest(email = "context-validation-admin@example.com", password = "password123"))
+        val tenant = createTenant(adminLogin.accessToken, CreateTenantRequest(name = "context-validation-team"))
+        val project = createProject(adminLogin.accessToken, tenant.id, CreateProjectRequest(name = "context-validation-project"))
+
+        mockMvc.perform(
+            post("/api/platform/projects/${project.id}/context-sources")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer ${adminLogin.accessToken}")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    objectMapper.writeValueAsBytes(
+                        CreateProjectContextSourceRequest(
+                            name = "empty-document",
+                            type = ContextSourceType.DOCUMENT,
+                        ),
+                    ),
+                ),
+        )
+            .andExpect(status().isBadRequest)
+            .andExpect { result ->
+                val response = objectMapper.readValue(result.response.contentAsByteArray, BaseOutput::class.java)
+                assertThat(response.errorCode).isEqualTo("CONTEXTSOURCE_003")
+            }
     }
 
     @Test
@@ -781,6 +847,40 @@ class PlatformManagementIntegrationTests : IntegrationTestSupport() {
                 .response.contentAsByteArray,
             ProjectAllowedModelsResponse::class.java,
         ).result
+
+    private fun createProjectContextSource(accessToken: String, projectId: Long, request: CreateProjectContextSourceRequest) =
+        objectMapper.readValue(
+            mockMvc.perform(
+                post("/api/platform/projects/$projectId/context-sources")
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsBytes(request)),
+            )
+                .andExpect(status().isOk)
+                .andReturn()
+                .response.contentAsByteArray,
+            ContextSourceResponse::class.java,
+        ).result
+
+    private fun listProjectContextSources(accessToken: String, projectId: Long) =
+        objectMapper.readValue(
+            mockMvc.perform(
+                get("/api/platform/projects/$projectId/context-sources")
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken"),
+            )
+                .andExpect(status().isOk)
+                .andReturn()
+                .response.contentAsByteArray,
+            ContextSourcesResponse::class.java,
+        ).result
+
+    private fun deleteProjectContextSource(accessToken: String, projectId: Long, contextSourceId: Long) {
+        mockMvc.perform(
+            delete("/api/platform/projects/$projectId/context-sources/$contextSourceId")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken"),
+        )
+            .andExpect(status().isOk)
+    }
 
     private fun createApiKey(accessToken: String, projectId: Long, request: CreateApiKeyRequest) =
         // API key 생성 응답은 원문 key를 포함하므로 별도 응답 타입으로 읽는다.

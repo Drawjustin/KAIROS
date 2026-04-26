@@ -4,7 +4,10 @@ import io.github.drawjustin.kairos.auth.security.AuthenticatedUser
 import io.github.drawjustin.kairos.common.api.BaseOutput
 import io.github.drawjustin.kairos.platform.dto.ApiKeyIssueResponse
 import io.github.drawjustin.kairos.platform.dto.ApiKeysResponse
+import io.github.drawjustin.kairos.platform.dto.ContextSourceResponse
+import io.github.drawjustin.kairos.platform.dto.ContextSourcesResponse
 import io.github.drawjustin.kairos.platform.dto.CreateApiKeyRequest
+import io.github.drawjustin.kairos.platform.dto.CreateProjectContextSourceRequest
 import io.github.drawjustin.kairos.platform.dto.CreateProjectRequest
 import io.github.drawjustin.kairos.platform.dto.CreateTenantUserRequest
 import io.github.drawjustin.kairos.platform.dto.ProjectAiUsageSummaryQuery
@@ -388,6 +391,119 @@ class PlatformController(
     ): ProjectAllowedModelsResponse = ProjectAllowedModelsResponse(
         result = platformManagementService.updateProjectAllowedModels(principal, projectId, request),
     )
+
+    @GetMapping("/projects/{projectId}/context-sources")
+    @Operation(
+        summary = "project context source 목록 조회",
+        description = "지정한 project에서 AI 응답 생성 시 참조할 수 있는 context source 목록을 조회한다. 해당 project의 tenant OWNER/ADMIN 또는 플랫폼 ADMIN만 가능하다.",
+    )
+    @SecurityRequirement(name = "bearerAuth")
+    @ApiResponses(
+        value = [
+            ApiResponse(
+                responseCode = "200",
+                description = "project context source 목록 조회 성공",
+                headers = [Header(name = "X-Trace-Id", description = "요청 추적용 trace identifier")],
+            ),
+            ApiResponse(
+                responseCode = "403",
+                description = "project 접근 권한 없음",
+                content = [Content(schema = Schema(implementation = BaseOutput::class))],
+            ),
+            ApiResponse(
+                responseCode = "404",
+                description = "project를 찾을 수 없음",
+                content = [Content(schema = Schema(implementation = BaseOutput::class))],
+            ),
+        ],
+    )
+    fun listProjectContextSources(
+        @AuthenticationPrincipal principal: AuthenticatedUser,
+        @Parameter(description = "context source 목록을 조회할 project ID", example = "1")
+        @PathVariable projectId: Long,
+    ): ContextSourcesResponse = ContextSourcesResponse(
+        result = platformManagementService.listProjectContextSources(principal, projectId),
+    )
+
+    @PostMapping("/projects/{projectId}/context-sources")
+    @Operation(
+        summary = "project context source 생성",
+        description = "새 context source를 만들고 지정한 project에 연결한다. 같은 이름의 source가 이미 있으면 기존 source를 project에 연결한다. 모든 source는 실제 문서/도구 위치를 가리키는 uri가 필요하다.",
+    )
+    @SecurityRequirement(name = "bearerAuth")
+    @ApiResponses(
+        value = [
+            ApiResponse(
+                responseCode = "200",
+                description = "project context source 생성 성공",
+                headers = [Header(name = "X-Trace-Id", description = "요청 추적용 trace identifier")],
+            ),
+            ApiResponse(
+                responseCode = "400",
+                description = "입력값 검증 실패",
+                content = [Content(schema = Schema(implementation = BaseOutput::class))],
+            ),
+            ApiResponse(
+                responseCode = "403",
+                description = "project 접근 권한 없음",
+                content = [Content(schema = Schema(implementation = BaseOutput::class))],
+            ),
+            ApiResponse(
+                responseCode = "404",
+                description = "project를 찾을 수 없음",
+                content = [Content(schema = Schema(implementation = BaseOutput::class))],
+            ),
+            ApiResponse(
+                responseCode = "409",
+                description = "이미 project에 연결된 context source",
+                content = [Content(schema = Schema(implementation = BaseOutput::class))],
+            ),
+        ],
+    )
+    // context source는 다음 단계의 prompt injection에서 project별 허용 자료 경계로 쓰인다.
+    fun createProjectContextSource(
+        @AuthenticationPrincipal principal: AuthenticatedUser,
+        @Parameter(description = "context source를 연결할 project ID", example = "1")
+        @PathVariable projectId: Long,
+        @Valid @RequestBody request: CreateProjectContextSourceRequest,
+    ): ContextSourceResponse = ContextSourceResponse(
+        result = platformManagementService.createProjectContextSource(principal, projectId, request),
+    )
+
+    @DeleteMapping("/projects/{projectId}/context-sources/{contextSourceId}")
+    @Operation(
+        summary = "project context source 연결 해제",
+        description = "지정한 project에서 context source 연결을 해제한다. 원본 context source row는 삭제하지 않고 project 연결만 soft delete한다.",
+    )
+    @SecurityRequirement(name = "bearerAuth")
+    @ApiResponses(
+        value = [
+            ApiResponse(
+                responseCode = "200",
+                description = "project context source 연결 해제 성공",
+                headers = [Header(name = "X-Trace-Id", description = "요청 추적용 trace identifier")],
+            ),
+            ApiResponse(
+                responseCode = "403",
+                description = "project 접근 권한 없음",
+                content = [Content(schema = Schema(implementation = BaseOutput::class))],
+            ),
+            ApiResponse(
+                responseCode = "404",
+                description = "project 또는 context source 연결을 찾을 수 없음",
+                content = [Content(schema = Schema(implementation = BaseOutput::class))],
+            ),
+        ],
+    )
+    fun deleteProjectContextSource(
+        @AuthenticationPrincipal principal: AuthenticatedUser,
+        @Parameter(description = "context source 연결을 해제할 project ID", example = "1")
+        @PathVariable projectId: Long,
+        @Parameter(description = "연결 해제할 context source ID", example = "1")
+        @PathVariable contextSourceId: Long,
+    ) = BaseOutput().also {
+        platformManagementService.deleteProjectContextSource(principal, projectId, contextSourceId)
+    }
 
     @PostMapping("/projects/{projectId}/api-keys")
     @Operation(summary = "API key 발급", description = "지정한 project 아래에 새 API key를 발급한다. 원문 key는 생성 응답에서 한 번만 노출된다.")
