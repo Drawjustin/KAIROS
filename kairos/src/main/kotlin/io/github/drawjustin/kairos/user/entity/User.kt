@@ -1,6 +1,7 @@
 package io.github.drawjustin.kairos.user.entity
 
 import io.github.drawjustin.kairos.common.persistence.BaseEntity
+import io.github.drawjustin.kairos.user.type.UserRole
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
 import jakarta.persistence.EnumType

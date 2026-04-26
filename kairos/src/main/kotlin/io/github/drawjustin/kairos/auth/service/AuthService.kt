@@ -12,7 +12,7 @@ import io.github.drawjustin.kairos.common.error.KairosErrorCode
 import io.github.drawjustin.kairos.common.error.KairosException
 import io.github.drawjustin.kairos.auth.security.Jwt
 import io.github.drawjustin.kairos.user.entity.User
-import io.github.drawjustin.kairos.user.entity.UserRole
+import io.github.drawjustin.kairos.user.type.UserRole
 import io.github.drawjustin.kairos.user.repository.UserRepository
 import io.jsonwebtoken.JwtException
 import java.time.Instant

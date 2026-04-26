@@ -1,5 +1,6 @@
 package io.github.drawjustin.kairos.tenant.entity
 
+import io.github.drawjustin.kairos.tenant.type.TenantUserRole
 import io.github.drawjustin.kairos.common.persistence.BaseEntity
 import io.github.drawjustin.kairos.user.entity.User
 import jakarta.persistence.Column

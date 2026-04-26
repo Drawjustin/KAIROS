@@ -26,12 +26,12 @@ import io.github.drawjustin.kairos.project.entity.Project
 import io.github.drawjustin.kairos.project.repository.ProjectRepository
 import io.github.drawjustin.kairos.tenant.entity.Tenant
 import io.github.drawjustin.kairos.tenant.entity.TenantUser
-import io.github.drawjustin.kairos.tenant.entity.TenantUserRole
 import io.github.drawjustin.kairos.tenant.repository.TenantRepository
 import io.github.drawjustin.kairos.tenant.repository.TenantUserRepository
+import io.github.drawjustin.kairos.tenant.type.TenantUserRole
 import io.github.drawjustin.kairos.user.entity.User
-import io.github.drawjustin.kairos.user.entity.UserRole
 import io.github.drawjustin.kairos.user.repository.UserRepository
+import io.github.drawjustin.kairos.user.type.UserRole
 import java.security.SecureRandom
 import java.time.Instant
 import java.time.temporal.ChronoUnit

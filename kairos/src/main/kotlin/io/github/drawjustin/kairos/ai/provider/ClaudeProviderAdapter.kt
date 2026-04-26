@@ -3,14 +3,14 @@ package io.github.drawjustin.kairos.ai.provider
 import io.github.drawjustin.kairos.ai.config.AnthropicProperties
 import io.github.drawjustin.kairos.ai.dto.AiModel
 import io.github.drawjustin.kairos.ai.dto.AiProvider
-import io.github.drawjustin.kairos.ai.dto.AnthropicMessage
-import io.github.drawjustin.kairos.ai.dto.AnthropicMessageRequest
-import io.github.drawjustin.kairos.ai.dto.AnthropicMessageResponse
 import io.github.drawjustin.kairos.ai.dto.ChatChoiceResponse
 import io.github.drawjustin.kairos.ai.dto.ChatCompletionRequest
 import io.github.drawjustin.kairos.ai.dto.ChatCompletionResponse
 import io.github.drawjustin.kairos.ai.dto.ChatMessageResponse
 import io.github.drawjustin.kairos.ai.dto.ChatUsageResponse
+import io.github.drawjustin.kairos.ai.provider.claude.AnthropicMessage
+import io.github.drawjustin.kairos.ai.provider.claude.AnthropicMessageRequest
+import io.github.drawjustin.kairos.ai.provider.claude.AnthropicMessageResponse
 import io.github.drawjustin.kairos.common.error.KairosErrorCode
 import io.github.drawjustin.kairos.common.error.KairosException
 import java.time.Instant

@@ -5,7 +5,7 @@ import io.github.drawjustin.kairos.apikey.repository.ApiKeyRepository
 import io.github.drawjustin.kairos.auth.service.TokenHasher
 import io.github.drawjustin.kairos.common.error.KairosErrorCode
 import io.github.drawjustin.kairos.common.error.KairosException
-import io.github.drawjustin.kairos.project.entity.ProjectStatus
+import io.github.drawjustin.kairos.project.type.ProjectStatus
 import java.time.Instant
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional

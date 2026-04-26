@@ -2,9 +2,9 @@ package io.github.drawjustin.kairos.ai
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import io.github.drawjustin.kairos.IntegrationTestSupport
-import io.github.drawjustin.kairos.ai.entity.AiUsageStatus
 import io.github.drawjustin.kairos.ai.repository.AiUsageLogRepository
 import io.github.drawjustin.kairos.ai.dto.AiModel
+import io.github.drawjustin.kairos.ai.type.AiUsageStatus
 import io.github.drawjustin.kairos.ai.dto.ChatChoiceResponse
 import io.github.drawjustin.kairos.ai.dto.ChatCompletionRequest
 import io.github.drawjustin.kairos.ai.dto.ChatCompletionResponse
@@ -29,8 +29,8 @@ import io.github.drawjustin.kairos.platform.dto.TenantResponse
 import io.github.drawjustin.kairos.project.repository.ProjectRepository
 import io.github.drawjustin.kairos.tenant.repository.TenantRepository
 import io.github.drawjustin.kairos.tenant.repository.TenantUserRepository
-import io.github.drawjustin.kairos.user.entity.UserRole
 import io.github.drawjustin.kairos.user.repository.UserRepository
+import io.github.drawjustin.kairos.user.type.UserRole
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test

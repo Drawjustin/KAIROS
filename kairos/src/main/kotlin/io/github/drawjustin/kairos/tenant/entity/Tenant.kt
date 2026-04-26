@@ -1,6 +1,7 @@
 package io.github.drawjustin.kairos.tenant.entity
 
 import io.github.drawjustin.kairos.common.persistence.BaseEntity
+import io.github.drawjustin.kairos.tenant.type.TenantStatus
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
 import jakarta.persistence.EnumType

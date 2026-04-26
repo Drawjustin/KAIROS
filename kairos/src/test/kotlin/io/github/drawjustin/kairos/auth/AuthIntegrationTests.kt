@@ -17,8 +17,8 @@ import io.github.drawjustin.kairos.apikey.repository.ApiKeyRepository
 import java.time.Instant
 import io.github.drawjustin.kairos.project.repository.ProjectRepository
 import io.github.drawjustin.kairos.tenant.repository.TenantRepository
-import io.github.drawjustin.kairos.user.entity.UserRole
 import io.github.drawjustin.kairos.user.repository.UserRepository
+import io.github.drawjustin.kairos.user.type.UserRole
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test

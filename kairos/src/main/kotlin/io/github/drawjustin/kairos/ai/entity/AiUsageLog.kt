@@ -1,6 +1,7 @@
 package io.github.drawjustin.kairos.ai.entity
 
 import io.github.drawjustin.kairos.apikey.entity.ApiKey
+import io.github.drawjustin.kairos.ai.type.AiUsageStatus
 import io.github.drawjustin.kairos.project.entity.Project
 import jakarta.persistence.Column
 import jakarta.persistence.Entity

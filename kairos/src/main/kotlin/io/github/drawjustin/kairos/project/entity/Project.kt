@@ -1,6 +1,8 @@
 package io.github.drawjustin.kairos.project.entity
 
 import io.github.drawjustin.kairos.common.persistence.BaseEntity
+import io.github.drawjustin.kairos.project.type.ProjectEnvironment
+import io.github.drawjustin.kairos.project.type.ProjectStatus
 import io.github.drawjustin.kairos.tenant.entity.Tenant
 import jakarta.persistence.Column
 import jakarta.persistence.Entity

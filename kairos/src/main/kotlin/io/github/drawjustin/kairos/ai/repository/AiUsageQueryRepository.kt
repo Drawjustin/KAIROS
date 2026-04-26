@@ -2,8 +2,8 @@ package io.github.drawjustin.kairos.ai.repository
 
 import com.querydsl.core.types.dsl.CaseBuilder
 import com.querydsl.jpa.impl.JPAQueryFactory
-import io.github.drawjustin.kairos.ai.entity.AiUsageStatus
 import io.github.drawjustin.kairos.ai.entity.QAiUsageLog
+import io.github.drawjustin.kairos.ai.type.AiUsageStatus
 import java.time.Instant
 import org.springframework.stereotype.Repository
 

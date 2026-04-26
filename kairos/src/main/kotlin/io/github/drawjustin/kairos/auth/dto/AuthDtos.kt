@@ -1,7 +1,7 @@
 package io.github.drawjustin.kairos.auth.dto
 
 import io.github.drawjustin.kairos.common.api.BaseOutput
-import io.github.drawjustin.kairos.user.entity.UserRole
+import io.github.drawjustin.kairos.user.type.UserRole
 import io.swagger.v3.oas.annotations.media.Schema
 import jakarta.validation.constraints.Email
 import jakarta.validation.constraints.NotBlank

@@ -1,4 +1,4 @@
-package io.github.drawjustin.kairos.ai.dto
+package io.github.drawjustin.kairos.ai.provider.gemini
 
 data class GeminiGenerateContentRequest(
     val contents: List<GeminiContent>,

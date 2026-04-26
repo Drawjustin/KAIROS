@@ -3,8 +3,8 @@ package io.github.drawjustin.kairos.ai.service
 import io.github.drawjustin.kairos.ai.dto.AiModel
 import io.github.drawjustin.kairos.ai.dto.ChatCompletionResponse
 import io.github.drawjustin.kairos.ai.entity.AiUsageLog
-import io.github.drawjustin.kairos.ai.entity.AiUsageStatus
 import io.github.drawjustin.kairos.ai.repository.AiUsageLogRepository
+import io.github.drawjustin.kairos.ai.type.AiUsageStatus
 import io.github.drawjustin.kairos.apikey.entity.ApiKey
 import org.slf4j.MDC
 import org.springframework.stereotype.Service

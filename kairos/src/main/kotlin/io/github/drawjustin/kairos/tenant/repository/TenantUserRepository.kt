@@ -1,7 +1,7 @@
 package io.github.drawjustin.kairos.tenant.repository
 
 import io.github.drawjustin.kairos.tenant.entity.TenantUser
-import io.github.drawjustin.kairos.tenant.entity.TenantUserRole
+import io.github.drawjustin.kairos.tenant.type.TenantUserRole
 import java.util.Optional
 import org.springframework.data.jpa.repository.JpaRepository
 

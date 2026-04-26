@@ -1,4 +1,4 @@
-package io.github.drawjustin.kairos.ai.dto
+package io.github.drawjustin.kairos.ai.provider.claude
 
 import com.fasterxml.jackson.annotation.JsonProperty
 

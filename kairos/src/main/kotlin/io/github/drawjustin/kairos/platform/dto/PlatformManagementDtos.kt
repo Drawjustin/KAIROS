@@ -1,10 +1,10 @@
 package io.github.drawjustin.kairos.platform.dto
 
 import io.github.drawjustin.kairos.common.api.BaseOutput
-import io.github.drawjustin.kairos.project.entity.ProjectEnvironment
-import io.github.drawjustin.kairos.project.entity.ProjectStatus
-import io.github.drawjustin.kairos.tenant.entity.TenantStatus
-import io.github.drawjustin.kairos.tenant.entity.TenantUserRole
+import io.github.drawjustin.kairos.project.type.ProjectEnvironment
+import io.github.drawjustin.kairos.project.type.ProjectStatus
+import io.github.drawjustin.kairos.tenant.type.TenantStatus
+import io.github.drawjustin.kairos.tenant.type.TenantUserRole
 import io.swagger.v3.oas.annotations.media.Schema
 import jakarta.validation.constraints.NotBlank
 import jakarta.validation.constraints.NotNull

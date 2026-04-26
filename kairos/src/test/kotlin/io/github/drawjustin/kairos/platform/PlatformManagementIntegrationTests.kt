@@ -3,8 +3,8 @@ package io.github.drawjustin.kairos.platform
 import com.fasterxml.jackson.databind.ObjectMapper
 import io.github.drawjustin.kairos.IntegrationTestSupport
 import io.github.drawjustin.kairos.ai.entity.AiUsageLog
-import io.github.drawjustin.kairos.ai.entity.AiUsageStatus
 import io.github.drawjustin.kairos.ai.repository.AiUsageLogRepository
+import io.github.drawjustin.kairos.ai.type.AiUsageStatus
 import io.github.drawjustin.kairos.apikey.repository.ApiKeyRepository
 import io.github.drawjustin.kairos.auth.dto.AuthOutput
 import io.github.drawjustin.kairos.auth.dto.AuthResponse
@@ -26,13 +26,13 @@ import io.github.drawjustin.kairos.platform.dto.TenantUserResponse
 import io.github.drawjustin.kairos.platform.dto.TenantUsersResponse
 import io.github.drawjustin.kairos.platform.dto.TenantsResponse
 import io.github.drawjustin.kairos.platform.dto.UpdateTenantUserRoleRequest
-import io.github.drawjustin.kairos.project.entity.ProjectEnvironment
+import io.github.drawjustin.kairos.project.type.ProjectEnvironment
 import io.github.drawjustin.kairos.project.repository.ProjectRepository
-import io.github.drawjustin.kairos.tenant.entity.TenantUserRole
 import io.github.drawjustin.kairos.tenant.repository.TenantRepository
 import io.github.drawjustin.kairos.tenant.repository.TenantUserRepository
-import io.github.drawjustin.kairos.user.entity.UserRole
+import io.github.drawjustin.kairos.tenant.type.TenantUserRole
 import io.github.drawjustin.kairos.user.repository.UserRepository
+import io.github.drawjustin.kairos.user.type.UserRole
 import java.time.Instant
 import java.time.temporal.ChronoUnit
 import org.assertj.core.api.Assertions.assertThat

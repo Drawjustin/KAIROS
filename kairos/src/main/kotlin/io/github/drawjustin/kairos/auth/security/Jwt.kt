@@ -2,7 +2,7 @@ package io.github.drawjustin.kairos.auth.security
 
 import io.github.drawjustin.kairos.auth.config.JwtProperties
 import io.github.drawjustin.kairos.user.entity.User
-import io.github.drawjustin.kairos.user.entity.UserRole
+import io.github.drawjustin.kairos.user.type.UserRole
 import io.jsonwebtoken.Claims
 import io.jsonwebtoken.JwtException
 import io.jsonwebtoken.Jwts

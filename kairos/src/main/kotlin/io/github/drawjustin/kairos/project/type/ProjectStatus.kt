@@ -1,4 +1,4 @@
-package io.github.drawjustin.kairos.project.entity
+package io.github.drawjustin.kairos.project.type
 
 enum class ProjectStatus {
     ACTIVE,
