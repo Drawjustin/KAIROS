@@ -123,7 +123,7 @@ class UnifiedAiIntegrationTests : IntegrationTestSupport() {
         )
 
         given(providerRouter.route(AiModel.GPT_4O_MINI)).willReturn(providerAdapter)
-        given(providerAdapter.chatCompletion(enrichedRequest))
+        given(providerAdapter.chatCompletion(enrichedRequest, emptyList()))
             .willReturn(
                 ChatCompletionResponse(
                     id = "chatcmpl_test_123",
@@ -274,7 +274,7 @@ class UnifiedAiIntegrationTests : IntegrationTestSupport() {
         )
 
         given(providerRouter.route(AiModel.GPT_4O_MINI)).willReturn(providerAdapter)
-        given(providerAdapter.chatCompletion(enrichedRequest))
+        given(providerAdapter.chatCompletion(enrichedRequest, emptyList()))
             .willThrow(KairosException(KairosErrorCode.AI_PROVIDER_ERROR))
 
         mockMvc.perform(

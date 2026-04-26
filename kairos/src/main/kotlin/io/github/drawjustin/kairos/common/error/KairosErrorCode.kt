@@ -41,6 +41,8 @@ enum class KairosErrorCode(
     AI_PROVIDER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "AI_006", "AI provider request failed"),
     AI_MODEL_NOT_SUPPORTED(HttpStatus.BAD_REQUEST, "AI_007", "AI model is not supported"),
     AI_MODEL_NOT_ALLOWED(HttpStatus.FORBIDDEN, "AI_008", "AI model is not allowed for this project"),
+    AI_TOOL_NOT_ALLOWED(HttpStatus.FORBIDDEN, "AI_009", "AI tool is not allowed for this project"),
+    AI_TOOL_EXECUTION_FAILED(HttpStatus.BAD_GATEWAY, "AI_010", "AI tool execution failed"),
     INVALID_INPUT(HttpStatus.BAD_REQUEST, "COMMON_001", "Invalid input"),
     INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "COMMON_999", "Internal server error", slackError = true),
 }

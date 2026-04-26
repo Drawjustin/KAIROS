@@ -1,6 +1,7 @@
 package io.github.drawjustin.kairos.ai.provider.openai
 
 import com.fasterxml.jackson.annotation.JsonProperty
+import io.github.drawjustin.kairos.ai.tool.AiToolParameters
 
 data class OpenAiChatCompletionRequest(
     val model: String,
@@ -9,11 +10,29 @@ data class OpenAiChatCompletionRequest(
     val messages: List<OpenAiChatMessage>,
     val temperature: Double? = null,
     val stream: Boolean = false,
+    val tools: List<OpenAiTool>? = null,
+    @JsonProperty("tool_choice")
+    val toolChoice: String? = null,
 )
 
 data class OpenAiChatMessage(
     val role: String,
-    val content: String,
+    val content: String? = null,
+    @JsonProperty("tool_calls")
+    val toolCalls: List<OpenAiToolCall>? = null,
+    @JsonProperty("tool_call_id")
+    val toolCallId: String? = null,
+)
+
+data class OpenAiTool(
+    val type: String = "function",
+    val function: OpenAiToolFunction,
+)
+
+data class OpenAiToolFunction(
+    val name: String,
+    val description: String,
+    val parameters: AiToolParameters,
 )
 
 data class OpenAiChatCompletionResponse(
@@ -34,7 +53,20 @@ data class OpenAiChatChoice(
 
 data class OpenAiChatMessageResponse(
     val role: String,
-    val content: String?,
+    val content: String? = null,
+    @JsonProperty("tool_calls")
+    val toolCalls: List<OpenAiToolCall>? = null,
+)
+
+data class OpenAiToolCall(
+    val id: String,
+    val type: String,
+    val function: OpenAiToolCallFunction,
+)
+
+data class OpenAiToolCallFunction(
+    val name: String,
+    val arguments: String? = null,
 )
 
 data class OpenAiChatUsage(

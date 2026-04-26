@@ -25,7 +25,7 @@ class ProjectContextToolService(
             sourceId = sourceId,
             name = name.toToolName(sourceId),
             description = description?.takeIf { it.isNotBlank() }
-                ?: "${name} context가 필요할 때 사용한다.",
+                ?: "${name}와 관련된 사내 문서나 내부 도구 검색이 필요한 질문이 들어오면 사용한다.",
             sourceType = type,
             sourceUri = requireNotNull(uri) { "ContextSource uri must exist" },
         )

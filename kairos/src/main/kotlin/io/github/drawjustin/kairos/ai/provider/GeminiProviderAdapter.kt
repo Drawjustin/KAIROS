@@ -14,6 +14,7 @@ import io.github.drawjustin.kairos.ai.provider.gemini.GeminiGenerateContentRespo
 import io.github.drawjustin.kairos.ai.provider.gemini.GeminiGenerationConfig
 import io.github.drawjustin.kairos.ai.provider.gemini.GeminiPart
 import io.github.drawjustin.kairos.ai.provider.gemini.GeminiUsageMetadata
+import io.github.drawjustin.kairos.ai.tool.AiToolDefinition
 import io.github.drawjustin.kairos.ai.type.AiProvider
 import io.github.drawjustin.kairos.ai.type.ChatRole
 import io.github.drawjustin.kairos.common.error.KairosErrorCode
@@ -34,7 +35,7 @@ class GeminiProviderAdapter(
 
     override fun supports(model: AiModel): Boolean = model.provider == AiProvider.GEMINI
 
-    override fun chatCompletion(request: ChatCompletionRequest): ChatCompletionResponse {
+    override fun chatCompletion(request: ChatCompletionRequest, tools: List<AiToolDefinition>): ChatCompletionResponse {
         val apiKey = geminiProperties.apiKey.trim()
         if (apiKey.isBlank()) {
             throw KairosException(KairosErrorCode.AI_PROVIDER_NOT_CONFIGURED)

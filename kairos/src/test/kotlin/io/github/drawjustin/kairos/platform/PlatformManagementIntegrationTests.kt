@@ -229,7 +229,7 @@ class PlatformManagementIntegrationTests : IntegrationTestSupport() {
             CreateProjectContextSourceRequest(
                 name = "hr-policy-manual",
                 type = ContextSourceType.DOCUMENT,
-                description = "인사 정책 매뉴얼",
+                description = "연차, 휴가, 재택근무, 복지, 인사 규정, 휴직, 경조사, 근태에 대한 질문이 들어오면 사용한다. 사내 HR 정책 문서에서 관련 내용을 검색한다. 개인 급여, 인사평가, 징계 기록 같은 개인 민감정보 조회에는 사용하지 않는다.",
                 uri = "https://wiki.example.com/hr-policy",
             ),
         )
@@ -245,7 +245,7 @@ class PlatformManagementIntegrationTests : IntegrationTestSupport() {
         assertThat(tools).hasSize(1)
         assertThat(tools.single().sourceId).isEqualTo(created.id)
         assertThat(tools.single().name).isEqualTo("hr-policy-manual_${created.id}")
-        assertThat(tools.single().description).isEqualTo("인사 정책 매뉴얼")
+        assertThat(tools.single().description).contains("연차", "휴가", "개인 민감정보")
         assertThat(tools.single().sourceType).isEqualTo(ContextSourceType.DOCUMENT)
         assertThat(tools.single().sourceUri).isEqualTo("https://wiki.example.com/hr-policy")
         assertThat(tools.single().parameters.required).containsExactly("query")

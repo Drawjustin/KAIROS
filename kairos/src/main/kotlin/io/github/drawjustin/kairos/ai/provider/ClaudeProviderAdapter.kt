@@ -10,6 +10,7 @@ import io.github.drawjustin.kairos.ai.dto.ChatUsageResponse
 import io.github.drawjustin.kairos.ai.provider.claude.AnthropicMessage
 import io.github.drawjustin.kairos.ai.provider.claude.AnthropicMessageRequest
 import io.github.drawjustin.kairos.ai.provider.claude.AnthropicMessageResponse
+import io.github.drawjustin.kairos.ai.tool.AiToolDefinition
 import io.github.drawjustin.kairos.ai.type.AiProvider
 import io.github.drawjustin.kairos.ai.type.ChatRole
 import io.github.drawjustin.kairos.common.error.KairosErrorCode
@@ -30,7 +31,7 @@ class ClaudeProviderAdapter(
 
     override fun supports(model: AiModel): Boolean = model.provider == AiProvider.CLAUDE
 
-    override fun chatCompletion(request: ChatCompletionRequest): ChatCompletionResponse {
+    override fun chatCompletion(request: ChatCompletionRequest, tools: List<AiToolDefinition>): ChatCompletionResponse {
         val apiKey = anthropicProperties.apiKey.trim()
         if (apiKey.isBlank()) {
             throw KairosException(KairosErrorCode.AI_PROVIDER_NOT_CONFIGURED)

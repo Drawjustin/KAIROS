@@ -23,7 +23,7 @@ data class AiToolParameters(
             properties = mapOf(
                 "query" to AiToolParameterProperty(
                     type = "string",
-                    description = "사용자 질문에서 추출한 검색어",
+                    description = "검색할 정책명, 업무 키워드, 이슈 키워드를 짧은 한국어 검색어로 작성한다.",
                 ),
             ),
             required = listOf("query"),
