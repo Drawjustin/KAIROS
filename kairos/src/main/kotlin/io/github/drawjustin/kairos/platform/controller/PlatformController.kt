@@ -11,6 +11,8 @@ import io.github.drawjustin.kairos.platform.dto.ProjectAiUsageSummaryQuery
 import io.github.drawjustin.kairos.platform.dto.ProjectAiUsageSummaryResponse
 import io.github.drawjustin.kairos.platform.dto.ProjectResponse
 import io.github.drawjustin.kairos.platform.dto.ProjectsResponse
+import io.github.drawjustin.kairos.platform.dto.TenantAiUsageSummaryQuery
+import io.github.drawjustin.kairos.platform.dto.TenantAiUsageSummaryResponse
 import io.github.drawjustin.kairos.platform.dto.TenantUserResponse
 import io.github.drawjustin.kairos.platform.dto.TenantUsersResponse
 import io.github.drawjustin.kairos.platform.dto.UpdateTenantUserRoleRequest
@@ -270,6 +272,46 @@ class PlatformController(
         @PathVariable tenantId: Long,
     ): ProjectsResponse = ProjectsResponse(
         result = platformManagementService.listProjects(principal, tenantId),
+    )
+
+    @GetMapping("/tenants/{tenantId}/ai-usage/summary")
+    @Operation(
+        summary = "tenant AI 사용량 요약 조회",
+        description = "지정한 tenant의 AI 요청 수와 토큰 사용량을 기간 및 project 단위로 집계한다. 기간을 생략하면 최근 30일을 조회한다.",
+    )
+    @SecurityRequirement(name = "bearerAuth")
+    @ApiResponses(
+        value = [
+            ApiResponse(
+                responseCode = "200",
+                description = "tenant AI 사용량 요약 조회 성공",
+                headers = [Header(name = "X-Trace-Id", description = "요청 추적용 trace identifier")],
+            ),
+            ApiResponse(
+                responseCode = "400",
+                description = "기간 조건이 올바르지 않음",
+                content = [Content(schema = Schema(implementation = BaseOutput::class))],
+            ),
+            ApiResponse(
+                responseCode = "403",
+                description = "tenant 접근 권한 없음",
+                content = [Content(schema = Schema(implementation = BaseOutput::class))],
+            ),
+            ApiResponse(
+                responseCode = "404",
+                description = "tenant를 찾을 수 없음",
+                content = [Content(schema = Schema(implementation = BaseOutput::class))],
+            ),
+        ],
+    )
+    // tenant 사용량 조회는 운영자가 어느 project가 비용을 많이 쓰는지 드릴다운하기 위한 첫 화면이다.
+    fun getTenantAiUsageSummary(
+        @AuthenticationPrincipal principal: AuthenticatedUser,
+        @Parameter(description = "AI 사용량을 조회할 tenant ID", example = "1")
+        @PathVariable tenantId: Long,
+        @Valid query: TenantAiUsageSummaryQuery,
+    ): TenantAiUsageSummaryResponse = TenantAiUsageSummaryResponse(
+        result = platformManagementService.getTenantAiUsageSummary(principal, tenantId, query),
     )
 
     @PostMapping("/projects/{projectId}/api-keys")

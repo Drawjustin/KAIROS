@@ -14,33 +14,12 @@ class AiUsageQueryRepository(
 ) {
     private val aiUsageLog = QAiUsageLog.aiUsageLog
 
-    fun summarizeProjectUsage(projectId: Long, from: Instant, to: Instant): AiUsageSummaryRow {
-        val totalRequests = aiUsageLog.id.count()
-        val successRequests = statusCount(AiUsageStatus.SUCCESS)
-        val failedRequests = statusCount(AiUsageStatus.FAILED)
-        val inputTokens = aiUsageLog.inputTokens.sum()
-        val outputTokens = aiUsageLog.outputTokens.sum()
-        val totalTokens = aiUsageLog.totalTokens.sum()
-
-        val result = queryFactory
-            .select(totalRequests, successRequests, failedRequests, inputTokens, outputTokens, totalTokens)
-            .from(aiUsageLog)
-            .where(
-                aiUsageLog.project.id.eq(projectId),
-                aiUsageLog.createdAt.goe(from),
-                aiUsageLog.createdAt.lt(to),
-            )
-            .fetchOne()
-
-        return AiUsageSummaryRow(
-            totalRequests = result?.get(totalRequests) ?: 0,
-            successRequests = result?.get(successRequests) ?: 0,
-            failedRequests = result?.get(failedRequests) ?: 0,
-            inputTokens = result?.get(inputTokens)?.toLong() ?: 0,
-            outputTokens = result?.get(outputTokens)?.toLong() ?: 0,
-            totalTokens = result?.get(totalTokens)?.toLong() ?: 0,
+    fun summarizeProjectUsage(projectId: Long, from: Instant, to: Instant): AiUsageSummaryRow =
+        summarizeUsage(
+            from = from,
+            to = to,
+            projectId = projectId,
         )
-    }
 
     fun summarizeProjectUsageByModel(projectId: Long, from: Instant, to: Instant): List<AiUsageModelBreakdownRow> {
         val totalRequests = aiUsageLog.id.count()
@@ -89,6 +68,88 @@ class AiUsageQueryRepository(
             }
     }
 
+    fun summarizeTenantUsage(tenantId: Long, from: Instant, to: Instant): AiUsageSummaryRow =
+        summarizeUsage(
+            from = from,
+            to = to,
+            tenantId = tenantId,
+        )
+
+    fun summarizeTenantUsageByProject(tenantId: Long, from: Instant, to: Instant): List<AiUsageProjectBreakdownRow> {
+        val totalRequests = aiUsageLog.id.count()
+        val successRequests = statusCount(AiUsageStatus.SUCCESS)
+        val failedRequests = statusCount(AiUsageStatus.FAILED)
+        val inputTokens = aiUsageLog.inputTokens.sum()
+        val outputTokens = aiUsageLog.outputTokens.sum()
+        val totalTokens = aiUsageLog.totalTokens.sum()
+
+        return queryFactory
+            .select(
+                aiUsageLog.project.id,
+                aiUsageLog.project.name,
+                totalRequests,
+                successRequests,
+                failedRequests,
+                inputTokens,
+                outputTokens,
+                totalTokens,
+            )
+            .from(aiUsageLog)
+            .where(
+                aiUsageLog.project.tenant.id.eq(tenantId),
+                aiUsageLog.createdAt.goe(from),
+                aiUsageLog.createdAt.lt(to),
+            )
+            .groupBy(aiUsageLog.project.id, aiUsageLog.project.name)
+            .orderBy(
+                totalTokens.desc(),
+                totalRequests.desc(),
+                aiUsageLog.project.name.asc(),
+            )
+            .fetch()
+            .map {
+                AiUsageProjectBreakdownRow(
+                    projectId = requireNotNull(it.get(aiUsageLog.project.id)),
+                    projectName = requireNotNull(it.get(aiUsageLog.project.name)),
+                    totalRequests = it.get(totalRequests) ?: 0,
+                    successRequests = it.get(successRequests) ?: 0,
+                    failedRequests = it.get(failedRequests) ?: 0,
+                    inputTokens = it.get(inputTokens)?.toLong() ?: 0,
+                    outputTokens = it.get(outputTokens)?.toLong() ?: 0,
+                    totalTokens = it.get(totalTokens)?.toLong() ?: 0,
+                )
+            }
+    }
+
+    private fun summarizeUsage(from: Instant, to: Instant, projectId: Long? = null, tenantId: Long? = null): AiUsageSummaryRow {
+        val totalRequests = aiUsageLog.id.count()
+        val successRequests = statusCount(AiUsageStatus.SUCCESS)
+        val failedRequests = statusCount(AiUsageStatus.FAILED)
+        val inputTokens = aiUsageLog.inputTokens.sum()
+        val outputTokens = aiUsageLog.outputTokens.sum()
+        val totalTokens = aiUsageLog.totalTokens.sum()
+
+        val result = queryFactory
+            .select(totalRequests, successRequests, failedRequests, inputTokens, outputTokens, totalTokens)
+            .from(aiUsageLog)
+            .where(
+                projectId?.let { aiUsageLog.project.id.eq(it) },
+                tenantId?.let { aiUsageLog.project.tenant.id.eq(it) },
+                aiUsageLog.createdAt.goe(from),
+                aiUsageLog.createdAt.lt(to),
+            )
+            .fetchOne()
+
+        return AiUsageSummaryRow(
+            totalRequests = result?.get(totalRequests) ?: 0,
+            successRequests = result?.get(successRequests) ?: 0,
+            failedRequests = result?.get(failedRequests) ?: 0,
+            inputTokens = result?.get(inputTokens)?.toLong() ?: 0,
+            outputTokens = result?.get(outputTokens)?.toLong() ?: 0,
+            totalTokens = result?.get(totalTokens)?.toLong() ?: 0,
+        )
+    }
+
     private fun statusCount(status: AiUsageStatus) =
         CaseBuilder()
             .`when`(aiUsageLog.status.eq(status))
@@ -109,6 +170,17 @@ data class AiUsageSummaryRow(
 data class AiUsageModelBreakdownRow(
     val provider: String,
     val model: String,
+    val totalRequests: Long,
+    val successRequests: Long,
+    val failedRequests: Long,
+    val inputTokens: Long,
+    val outputTokens: Long,
+    val totalTokens: Long,
+)
+
+data class AiUsageProjectBreakdownRow(
+    val projectId: Long,
+    val projectName: String,
     val totalRequests: Long,
     val successRequests: Long,
     val failedRequests: Long,

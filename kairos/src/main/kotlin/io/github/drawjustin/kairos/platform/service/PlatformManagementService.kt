@@ -17,6 +17,8 @@ import io.github.drawjustin.kairos.platform.dto.ProjectAiUsageSummaryOutput
 import io.github.drawjustin.kairos.platform.dto.ProjectAiUsageSummaryQuery
 import io.github.drawjustin.kairos.platform.dto.ProjectOutput
 import io.github.drawjustin.kairos.platform.dto.TenantOutput
+import io.github.drawjustin.kairos.platform.dto.TenantAiUsageSummaryOutput
+import io.github.drawjustin.kairos.platform.dto.TenantAiUsageSummaryQuery
 import io.github.drawjustin.kairos.platform.dto.TenantUserOutput
 import io.github.drawjustin.kairos.platform.dto.UpdateTenantUserRoleRequest
 import io.github.drawjustin.kairos.project.entity.Project
@@ -238,6 +240,17 @@ class PlatformManagementService(
         val project = resolveManagedProject(principal, projectId)
         val resolvedProjectId = requireNotNull(project.id) { "Project id must exist" }
         return aiUsageService.getProjectUsageSummary(resolvedProjectId, query)
+    }
+
+    @Transactional(readOnly = true)
+    fun getTenantAiUsageSummary(
+        principal: AuthenticatedUser,
+        tenantId: Long,
+        query: TenantAiUsageSummaryQuery,
+    ): TenantAiUsageSummaryOutput {
+        val tenant = resolveTenantForRole(principal, tenantId, managerRoles())
+        val resolvedTenantId = requireNotNull(tenant.id) { "Tenant id must exist" }
+        return aiUsageService.getTenantUsageSummary(resolvedTenantId, query)
     }
 
     private fun resolveTenantForRole(

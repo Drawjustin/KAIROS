@@ -21,6 +21,7 @@ import io.github.drawjustin.kairos.platform.dto.CreateTenantUserRequest
 import io.github.drawjustin.kairos.platform.dto.ProjectAiUsageSummaryResponse
 import io.github.drawjustin.kairos.platform.dto.ProjectResponse
 import io.github.drawjustin.kairos.platform.dto.ProjectsResponse
+import io.github.drawjustin.kairos.platform.dto.TenantAiUsageSummaryResponse
 import io.github.drawjustin.kairos.platform.dto.TenantResponse
 import io.github.drawjustin.kairos.platform.dto.TenantUserResponse
 import io.github.drawjustin.kairos.platform.dto.TenantUsersResponse
@@ -513,6 +514,90 @@ class PlatformManagementIntegrationTests : IntegrationTestSupport() {
         assertThat(byModel["OPENAI" to "gpt-4o-mini"]?.totalTokens).isEqualTo(420)
         assertThat(byModel["CLAUDE" to "claude-sonnet-4-6"]?.failedRequests).isEqualTo(1)
         assertThat(byModel).doesNotContainKey("GEMINI" to "gemini-2.5-flash")
+    }
+
+    @Test
+    fun `tenant manager can view tenant ai usage summary by project`() {
+        register(RegisterRequest(email = "tenant-usage-admin@example.com", password = "password123"))
+        val adminUser = userRepository.findByEmailAndDeletedAtIsNull("tenant-usage-admin@example.com").orElseThrow()
+        adminUser.role = UserRole.ADMIN
+        userRepository.save(adminUser)
+        val adminLogin = login(LoginRequest(email = "tenant-usage-admin@example.com", password = "password123"))
+
+        val tenant = createTenant(adminLogin.accessToken, CreateTenantRequest(name = "tenant-usage-team"))
+        val project = createProject(adminLogin.accessToken, tenant.id, CreateProjectRequest(name = "usage-project-a"))
+        val otherProject = createProject(adminLogin.accessToken, tenant.id, CreateProjectRequest(name = "usage-project-b"))
+        val issuedKey = createApiKey(adminLogin.accessToken, project.id, CreateApiKeyRequest(name = "default-key"))
+        val otherIssuedKey = createApiKey(adminLogin.accessToken, otherProject.id, CreateApiKeyRequest(name = "other-key"))
+        val projectEntity = projectRepository.findByIdAndDeletedAtIsNull(project.id).orElseThrow()
+        val otherProjectEntity = projectRepository.findByIdAndDeletedAtIsNull(otherProject.id).orElseThrow()
+        val apiKey = apiKeyRepository.findById(issuedKey.key.id).orElseThrow()
+        val otherApiKey = apiKeyRepository.findById(otherIssuedKey.key.id).orElseThrow()
+
+        aiUsageLogRepository.saveAll(
+            listOf(
+                AiUsageLog(
+                    project = projectEntity,
+                    apiKey = apiKey,
+                    provider = "OPENAI",
+                    model = "gpt-4o-mini",
+                    inputTokens = 100,
+                    outputTokens = 50,
+                    totalTokens = 150,
+                    status = AiUsageStatus.SUCCESS,
+                    latencyMs = 120,
+                ),
+                AiUsageLog(
+                    project = projectEntity,
+                    apiKey = apiKey,
+                    provider = "CLAUDE",
+                    model = "claude-sonnet-4-6",
+                    status = AiUsageStatus.FAILED,
+                    latencyMs = 80,
+                    errorCode = "AI_006",
+                ),
+                AiUsageLog(
+                    project = otherProjectEntity,
+                    apiKey = otherApiKey,
+                    provider = "GEMINI",
+                    model = "gemini-2.5-flash",
+                    inputTokens = 300,
+                    outputTokens = 130,
+                    totalTokens = 430,
+                    status = AiUsageStatus.SUCCESS,
+                    latencyMs = 90,
+                ),
+            ),
+        )
+
+        val from = Instant.now().minus(1, ChronoUnit.DAYS)
+        val to = Instant.now().plus(1, ChronoUnit.DAYS)
+        val result = mockMvc.perform(
+            get("/api/platform/tenants/${tenant.id}/ai-usage/summary")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer ${adminLogin.accessToken}")
+                .param("from", from.toString())
+                .param("to", to.toString()),
+        )
+            .andExpect(status().isOk)
+            .andReturn()
+
+        val response = objectMapper.readValue(result.response.contentAsByteArray, TenantAiUsageSummaryResponse::class.java).result
+        assertThat(response.tenantId).isEqualTo(tenant.id)
+        assertThat(response.totalRequests).isEqualTo(3)
+        assertThat(response.successRequests).isEqualTo(2)
+        assertThat(response.failedRequests).isEqualTo(1)
+        assertThat(response.inputTokens).isEqualTo(400)
+        assertThat(response.outputTokens).isEqualTo(180)
+        assertThat(response.totalTokens).isEqualTo(580)
+
+        val byProject = response.byProject.associateBy { it.projectId }
+        assertThat(byProject[project.id]?.projectName).isEqualTo("usage-project-a")
+        assertThat(byProject[project.id]?.totalRequests).isEqualTo(2)
+        assertThat(byProject[project.id]?.failedRequests).isEqualTo(1)
+        assertThat(byProject[project.id]?.totalTokens).isEqualTo(150)
+        assertThat(byProject[otherProject.id]?.projectName).isEqualTo("usage-project-b")
+        assertThat(byProject[otherProject.id]?.totalRequests).isEqualTo(1)
+        assertThat(byProject[otherProject.id]?.totalTokens).isEqualTo(430)
     }
 
     private fun register(request: RegisterRequest): AuthOutput {
