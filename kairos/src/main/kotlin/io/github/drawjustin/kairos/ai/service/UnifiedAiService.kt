@@ -17,6 +17,7 @@ class UnifiedAiService(
     private val providerRouter: ProviderRouter,
     private val aiUsageLoggingService: AiUsageLoggingService,
     private val projectAllowedModelRepository: ProjectAllowedModelRepository,
+    private val projectContextToolService: ProjectContextToolService,
 ) {
     fun chatCompletion(
         authorizationHeader: String?,
@@ -28,12 +29,15 @@ class UnifiedAiService(
 
         val apiKey = extractBearerToken(authorizationHeader)
         val credential = aiApiKeyService.authenticate(apiKey)
+        val projectId = requireNotNull(credential.project.id) { "API key project id must exist" }
 
+        // 다음 단계에서 provider별 tool calling 형식으로 변환하기 위해 project 허용 tool catalog를 먼저 준비한다.
+        projectContextToolService.getProjectTools(projectId)
         val enrichedRequest = request.withDefaultSystemPrompt()
         val startedAt = System.nanoTime()
         val response = try {
             validateAllowedModel(
-                projectId = requireNotNull(credential.project.id) { "API key project id must exist" },
+                projectId = projectId,
                 request = enrichedRequest,
             )
             val providerAdapter = providerRouter.route(enrichedRequest.model)

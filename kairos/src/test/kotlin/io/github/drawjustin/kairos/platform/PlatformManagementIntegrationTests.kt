@@ -34,6 +34,7 @@ import io.github.drawjustin.kairos.platform.dto.TenantUsersResponse
 import io.github.drawjustin.kairos.platform.dto.TenantsResponse
 import io.github.drawjustin.kairos.platform.dto.UpdateProjectAllowedModelsRequest
 import io.github.drawjustin.kairos.platform.dto.UpdateTenantUserRoleRequest
+import io.github.drawjustin.kairos.ai.service.ProjectContextToolService
 import io.github.drawjustin.kairos.project.type.ProjectEnvironment
 import io.github.drawjustin.kairos.project.repository.ProjectRepository
 import io.github.drawjustin.kairos.tenant.repository.TenantRepository
@@ -89,6 +90,9 @@ class PlatformManagementIntegrationTests : IntegrationTestSupport() {
 
     @Autowired
     lateinit var aiUsageLogRepository: AiUsageLogRepository
+
+    @Autowired
+    lateinit var projectContextToolService: ProjectContextToolService
 
     @Autowired
     lateinit var refreshSessionRepository: RefreshSessionRepository
@@ -236,6 +240,15 @@ class PlatformManagementIntegrationTests : IntegrationTestSupport() {
         val listed = listProjectContextSources(adminLogin.accessToken, project.id)
         assertThat(listed).hasSize(1)
         assertThat(listed.single().id).isEqualTo(created.id)
+
+        val tools = projectContextToolService.getProjectTools(project.id)
+        assertThat(tools).hasSize(1)
+        assertThat(tools.single().sourceId).isEqualTo(created.id)
+        assertThat(tools.single().name).isEqualTo("hr-policy-manual_${created.id}")
+        assertThat(tools.single().description).isEqualTo("인사 정책 매뉴얼")
+        assertThat(tools.single().sourceType).isEqualTo(ContextSourceType.DOCUMENT)
+        assertThat(tools.single().sourceUri).isEqualTo("https://wiki.example.com/hr-policy")
+        assertThat(tools.single().parameters.required).containsExactly("query")
 
         deleteProjectContextSource(adminLogin.accessToken, project.id, created.id)
         assertThat(listProjectContextSources(adminLogin.accessToken, project.id)).isEmpty()
