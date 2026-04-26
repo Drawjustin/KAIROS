@@ -1,4 +1,5 @@
 HELP.md
+.DS_Store
 .gradle
 build/
 !gradle/wrapper/gradle-wrapper.jar
@@ -47,3 +48,4 @@ node_modules/
 
 ### Local Scratch ###
 jailbreak
+jailbreak.*

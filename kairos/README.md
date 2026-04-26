@@ -24,29 +24,47 @@ flowchart LR
     F --> G["Provider Router"]
     G --> H["OpenAI Adapter"]
     G --> I["Claude Adapter"]
-    H --> J["OpenAI Chat API"]
-    I --> K["Claude Messages API"]
+    G --> J["Gemini Adapter"]
+    H --> K["OpenAI Chat API"]
+    I --> L["Claude Messages API"]
+    J --> M["Gemini Generate Content API"]
 
-    F --> L["Usage Logging"]
+    F --> N["Usage Logging"]
+    N --> O["Usage Summary API"]
 
-    D --> M["Tenant"]
-    D --> N["Project"]
-    D --> O["Tenant User"]
-    D --> P["API Key"]
+    D --> P["Tenant"]
+    D --> Q["Project"]
+    D --> R["Tenant User"]
+    D --> S["API Key"]
 
-    B --> Q["Internal Context Extension"]
-    Q --> R["Docs / Wiki"]
-    Q --> S["Internal Tools"]
-    Q --> T["MCP Servers"]
+    B --> T["Internal Context Extension"]
+    T --> U["Docs / Wiki"]
+    T --> V["Internal Tools"]
+    T --> W["MCP Servers"]
 
-    M --> U["Policy Boundary"]
-    N --> U
-    O --> U
-    P --> U
+    P --> X["Policy Boundary"]
+    Q --> X
+    R --> X
+    S --> X
 ```
 
-현재 범위에서는 **Unified Chat API 연결**, **OpenAI / Claude 연동**, **API key 인증**, **tenant / project 기반 운영 경계**, **Provider Router / Adapter**, **사용량 추적의 출발점**까지를 먼저 구현합니다.  
+현재 범위에서는 **Unified Chat API 연결**, **OpenAI / Claude / Gemini 연동**, **API key 인증**, **tenant / project 기반 운영 경계**, **Provider Router / Adapter**, **AI 사용량 로깅과 project 단위 사용량 집계 API**까지를 먼저 구현합니다.  
 이후 필요에 따라 내부 문서 검색, Tool Calling, MCP 기반 확장으로 자연스럽게 이어질 수 있도록 구조를 잡고 있습니다.
+
+## 현재 구현된 범위
+
+- JWT 기반 회원가입, 로그인, refresh token 인증 흐름
+- ADMIN 전용 tenant 생성 및 전체 tenant 목록 조회 API
+- tenant user 기반 OWNER/ADMIN/MEMBER 역할 관리
+- tenant 아래 project 생성 및 목록 조회
+- project 단위 API key 발급, 목록 조회, 만료/폐기 상태 검증
+- `/api/v1/chat/completions` 단일 Unified Chat API
+- OpenAI, Claude, Gemini provider adapter와 model 기반 router
+- API key 기반 AI 호출 인증
+- 성공/실패 AI 사용량 로그 저장
+- QueryDSL 기반 project 사용량 요약 및 provider/model별 breakdown 조회
+- Flyway 기반 PostgreSQL 스키마 관리
+- Swagger 문서화, traceId 기반 요청 로그, Testcontainers 통합 테스트
 
 ## 왜 KAIROS가 필요한가
 
@@ -137,11 +155,11 @@ KAIROS가 진짜로 풀고 싶은 문제는 다음과 같습니다.
 
 가까운 단계에서는 다음을 우선 만듭니다.
 
-1. Unified AI API
-2. Provider Adapter 구조
-3. API key 인증
-4. 사용량 및 비용 로깅
-5. tenant / project 기반 운영 경계
+1. tenant 단위 사용량 집계와 project별 drilldown
+2. project별 허용 모델 정책
+3. API key별 rate limit, quota, budget 정책
+4. provider timeout, retry, fallback 정책
+5. 내부 문서 검색과 MCP 기반 context provider
 
 그다음 단계에서는 아래로 확장할 수 있습니다.
 
