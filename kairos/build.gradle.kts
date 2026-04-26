@@ -1,6 +1,7 @@
 plugins {
 	kotlin("jvm") version "1.9.25"
 	kotlin("plugin.spring") version "1.9.25"
+	kotlin("kapt") version "1.9.25"
 	id("org.springframework.boot") version "3.5.13"
 	id("io.spring.dependency-management") version "1.1.7"
 	kotlin("plugin.jpa") version "1.9.25"
@@ -19,11 +20,18 @@ repositories {
 	mavenCentral()
 }
 
+sourceSets {
+	main {
+		java.srcDir("build/generated/source/kapt/main")
+	}
+}
+
 dependencies {
 	implementation("org.springframework.boot:spring-boot-starter-data-jpa")
 	implementation("org.springframework.boot:spring-boot-starter-security")
 	implementation("org.springframework.boot:spring-boot-starter-validation")
 	implementation("org.springframework.boot:spring-boot-starter-web")
+	implementation("com.querydsl:querydsl-jpa:5.1.0:jakarta")
 	implementation("org.apache.commons:commons-lang3:3.18.0")
 	implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.16")
 	implementation("io.jsonwebtoken:jjwt-api:0.12.7")
@@ -34,6 +42,7 @@ dependencies {
 	runtimeOnly("io.jsonwebtoken:jjwt-impl:0.12.7")
 	runtimeOnly("io.jsonwebtoken:jjwt-jackson:0.12.7")
 	runtimeOnly("org.postgresql:postgresql")
+	kapt("com.querydsl:querydsl-apt:5.1.0:jakarta")
 	testImplementation("org.springframework.boot:spring-boot-testcontainers")
 	testImplementation("org.springframework.boot:spring-boot-starter-test")
 	testImplementation("org.jetbrains.kotlin:kotlin-test-junit5")

@@ -7,6 +7,8 @@ import io.github.drawjustin.kairos.platform.dto.ApiKeysResponse
 import io.github.drawjustin.kairos.platform.dto.CreateApiKeyRequest
 import io.github.drawjustin.kairos.platform.dto.CreateProjectRequest
 import io.github.drawjustin.kairos.platform.dto.CreateTenantUserRequest
+import io.github.drawjustin.kairos.platform.dto.ProjectAiUsageSummaryQuery
+import io.github.drawjustin.kairos.platform.dto.ProjectAiUsageSummaryResponse
 import io.github.drawjustin.kairos.platform.dto.ProjectResponse
 import io.github.drawjustin.kairos.platform.dto.ProjectsResponse
 import io.github.drawjustin.kairos.platform.dto.TenantUserResponse
@@ -356,5 +358,45 @@ class PlatformController(
         @PathVariable projectId: Long,
     ): ApiKeysResponse = ApiKeysResponse(
         result = platformManagementService.listApiKeys(principal, projectId),
+    )
+
+    @GetMapping("/projects/{projectId}/ai-usage/summary")
+    @Operation(
+        summary = "project AI 사용량 요약 조회",
+        description = "지정한 project의 AI 요청 수와 토큰 사용량을 기간 및 provider/model 단위로 집계한다. 기간을 생략하면 최근 30일을 조회한다.",
+    )
+    @SecurityRequirement(name = "bearerAuth")
+    @ApiResponses(
+        value = [
+            ApiResponse(
+                responseCode = "200",
+                description = "AI 사용량 요약 조회 성공",
+                headers = [Header(name = "X-Trace-Id", description = "요청 추적용 trace identifier")],
+            ),
+            ApiResponse(
+                responseCode = "400",
+                description = "기간 조건이 올바르지 않음",
+                content = [Content(schema = Schema(implementation = BaseOutput::class))],
+            ),
+            ApiResponse(
+                responseCode = "403",
+                description = "project 접근 권한 없음",
+                content = [Content(schema = Schema(implementation = BaseOutput::class))],
+            ),
+            ApiResponse(
+                responseCode = "404",
+                description = "project를 찾을 수 없음",
+                content = [Content(schema = Schema(implementation = BaseOutput::class))],
+            ),
+        ],
+    )
+    // 사용량 조회는 tenant/project 드릴다운 대시보드의 첫 단위가 된다.
+    fun getProjectAiUsageSummary(
+        @AuthenticationPrincipal principal: AuthenticatedUser,
+        @Parameter(description = "AI 사용량을 조회할 project ID", example = "1")
+        @PathVariable projectId: Long,
+        @Valid query: ProjectAiUsageSummaryQuery,
+    ): ProjectAiUsageSummaryResponse = ProjectAiUsageSummaryResponse(
+        result = platformManagementService.getProjectAiUsageSummary(principal, projectId, query),
     )
 }

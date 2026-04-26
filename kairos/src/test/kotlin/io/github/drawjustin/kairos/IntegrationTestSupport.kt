@@ -3,17 +3,17 @@ package io.github.drawjustin.kairos
 import org.springframework.test.context.DynamicPropertyRegistry
 import org.springframework.test.context.DynamicPropertySource
 import org.testcontainers.containers.PostgreSQLContainer
-import org.testcontainers.junit.jupiter.Container
-import org.testcontainers.junit.jupiter.Testcontainers
 
-@Testcontainers
 // 기능별 통합 테스트가 공통 PostgreSQL 컨테이너 설정을 재사용하도록 돕는다.
 abstract class IntegrationTestSupport {
     companion object {
-        @Container
         @JvmStatic
-        // 기능별 통합 테스트가 모두 같은 PostgreSQL 테스트 환경 설정을 공유한다.
+        // Spring ApplicationContext/Hikari pool과 생명주기가 엇갈리지 않도록 테스트 JVM 동안 직접 유지한다.
         val postgres = PostgreSQLContainer<Nothing>("postgres:16-alpine")
+
+        init {
+            postgres.start()
+        }
 
         @JvmStatic
         @DynamicPropertySource

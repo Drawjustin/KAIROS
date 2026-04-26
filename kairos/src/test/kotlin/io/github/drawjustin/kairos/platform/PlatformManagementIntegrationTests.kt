@@ -2,6 +2,9 @@ package io.github.drawjustin.kairos.platform
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import io.github.drawjustin.kairos.IntegrationTestSupport
+import io.github.drawjustin.kairos.ai.entity.AiUsageLog
+import io.github.drawjustin.kairos.ai.entity.AiUsageStatus
+import io.github.drawjustin.kairos.ai.repository.AiUsageLogRepository
 import io.github.drawjustin.kairos.apikey.repository.ApiKeyRepository
 import io.github.drawjustin.kairos.auth.dto.AuthOutput
 import io.github.drawjustin.kairos.auth.dto.AuthResponse
@@ -15,6 +18,7 @@ import io.github.drawjustin.kairos.platform.dto.CreateApiKeyRequest
 import io.github.drawjustin.kairos.platform.dto.CreateProjectRequest
 import io.github.drawjustin.kairos.platform.dto.CreateTenantRequest
 import io.github.drawjustin.kairos.platform.dto.CreateTenantUserRequest
+import io.github.drawjustin.kairos.platform.dto.ProjectAiUsageSummaryResponse
 import io.github.drawjustin.kairos.platform.dto.ProjectResponse
 import io.github.drawjustin.kairos.platform.dto.ProjectsResponse
 import io.github.drawjustin.kairos.platform.dto.TenantResponse
@@ -29,6 +33,8 @@ import io.github.drawjustin.kairos.tenant.repository.TenantRepository
 import io.github.drawjustin.kairos.tenant.repository.TenantUserRepository
 import io.github.drawjustin.kairos.user.entity.UserRole
 import io.github.drawjustin.kairos.user.repository.UserRepository
+import java.time.Instant
+import java.time.temporal.ChronoUnit
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -73,6 +79,9 @@ class PlatformManagementIntegrationTests : IntegrationTestSupport() {
     lateinit var apiKeyRepository: ApiKeyRepository
 
     @Autowired
+    lateinit var aiUsageLogRepository: AiUsageLogRepository
+
+    @Autowired
     lateinit var refreshSessionRepository: RefreshSessionRepository
 
     @Autowired
@@ -82,7 +91,7 @@ class PlatformManagementIntegrationTests : IntegrationTestSupport() {
     fun setUp() {
         // soft delete된 row까지 포함해 완전히 비워야 다음 테스트의 FK와 unique 제약이 흔들리지 않는다.
         jdbcTemplate.execute(
-            "truncate table api_key, project, tenant_user, tenant, refresh_session, users restart identity cascade",
+            "truncate table ai_usage_log, api_key, project, tenant_user, tenant, refresh_session, users restart identity cascade",
         )
     }
 
@@ -412,6 +421,98 @@ class PlatformManagementIntegrationTests : IntegrationTestSupport() {
                 val response = objectMapper.readValue(result.response.contentAsByteArray, BaseOutput::class.java)
                 assertThat(response.errorCode).isEqualTo("TENANTUSER_004")
             }
+    }
+
+    @Test
+    fun `tenant manager can view project ai usage summary`() {
+        register(RegisterRequest(email = "usage-admin@example.com", password = "password123"))
+        val adminUser = userRepository.findByEmailAndDeletedAtIsNull("usage-admin@example.com").orElseThrow()
+        adminUser.role = UserRole.ADMIN
+        userRepository.save(adminUser)
+        val adminLogin = login(LoginRequest(email = "usage-admin@example.com", password = "password123"))
+
+        val tenant = createTenant(adminLogin.accessToken, CreateTenantRequest(name = "usage-team"))
+        val project = createProject(adminLogin.accessToken, tenant.id, CreateProjectRequest(name = "usage-project"))
+        val otherProject = createProject(adminLogin.accessToken, tenant.id, CreateProjectRequest(name = "other-usage-project"))
+        val issuedKey = createApiKey(adminLogin.accessToken, project.id, CreateApiKeyRequest(name = "default-key"))
+        val otherIssuedKey = createApiKey(adminLogin.accessToken, otherProject.id, CreateApiKeyRequest(name = "other-key"))
+        val projectEntity = projectRepository.findByIdAndDeletedAtIsNull(project.id).orElseThrow()
+        val otherProjectEntity = projectRepository.findByIdAndDeletedAtIsNull(otherProject.id).orElseThrow()
+        val apiKey = apiKeyRepository.findById(issuedKey.key.id).orElseThrow()
+        val otherApiKey = apiKeyRepository.findById(otherIssuedKey.key.id).orElseThrow()
+
+        aiUsageLogRepository.saveAll(
+            listOf(
+                AiUsageLog(
+                    project = projectEntity,
+                    apiKey = apiKey,
+                    provider = "OPENAI",
+                    model = "gpt-4o-mini",
+                    inputTokens = 100,
+                    outputTokens = 50,
+                    totalTokens = 150,
+                    status = AiUsageStatus.SUCCESS,
+                    latencyMs = 120,
+                ),
+                AiUsageLog(
+                    project = projectEntity,
+                    apiKey = apiKey,
+                    provider = "OPENAI",
+                    model = "gpt-4o-mini",
+                    inputTokens = 200,
+                    outputTokens = 70,
+                    totalTokens = 270,
+                    status = AiUsageStatus.SUCCESS,
+                    latencyMs = 150,
+                ),
+                AiUsageLog(
+                    project = projectEntity,
+                    apiKey = apiKey,
+                    provider = "CLAUDE",
+                    model = "claude-sonnet-4-6",
+                    status = AiUsageStatus.FAILED,
+                    latencyMs = 80,
+                    errorCode = "AI_006",
+                ),
+                AiUsageLog(
+                    project = otherProjectEntity,
+                    apiKey = otherApiKey,
+                    provider = "GEMINI",
+                    model = "gemini-2.5-flash",
+                    inputTokens = 999,
+                    outputTokens = 999,
+                    totalTokens = 1_998,
+                    status = AiUsageStatus.SUCCESS,
+                    latencyMs = 90,
+                ),
+            ),
+        )
+
+        val from = Instant.now().minus(1, ChronoUnit.DAYS)
+        val to = Instant.now().plus(1, ChronoUnit.DAYS)
+        val result = mockMvc.perform(
+            get("/api/platform/projects/${project.id}/ai-usage/summary")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer ${adminLogin.accessToken}")
+                .param("from", from.toString())
+                .param("to", to.toString()),
+        )
+            .andExpect(status().isOk)
+            .andReturn()
+
+        val response = objectMapper.readValue(result.response.contentAsByteArray, ProjectAiUsageSummaryResponse::class.java).result
+        assertThat(response.projectId).isEqualTo(project.id)
+        assertThat(response.totalRequests).isEqualTo(3)
+        assertThat(response.successRequests).isEqualTo(2)
+        assertThat(response.failedRequests).isEqualTo(1)
+        assertThat(response.inputTokens).isEqualTo(300)
+        assertThat(response.outputTokens).isEqualTo(120)
+        assertThat(response.totalTokens).isEqualTo(420)
+
+        val byModel = response.byModel.associateBy { it.provider to it.model }
+        assertThat(byModel["OPENAI" to "gpt-4o-mini"]?.totalRequests).isEqualTo(2)
+        assertThat(byModel["OPENAI" to "gpt-4o-mini"]?.totalTokens).isEqualTo(420)
+        assertThat(byModel["CLAUDE" to "claude-sonnet-4-6"]?.failedRequests).isEqualTo(1)
+        assertThat(byModel).doesNotContainKey("GEMINI" to "gemini-2.5-flash")
     }
 
     private fun register(request: RegisterRequest): AuthOutput {

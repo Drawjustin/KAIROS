@@ -1,17 +1,23 @@
 package io.github.drawjustin.kairos.platform.service
 
+import io.github.drawjustin.kairos.ai.repository.AiUsageModelBreakdownRow
+import io.github.drawjustin.kairos.ai.repository.AiUsageQueryRepository
+import io.github.drawjustin.kairos.ai.repository.AiUsageSummaryRow
 import io.github.drawjustin.kairos.apikey.entity.ApiKey
 import io.github.drawjustin.kairos.apikey.repository.ApiKeyRepository
 import io.github.drawjustin.kairos.auth.security.AuthenticatedUser
 import io.github.drawjustin.kairos.auth.service.TokenHasher
 import io.github.drawjustin.kairos.common.error.KairosErrorCode
 import io.github.drawjustin.kairos.common.error.KairosException
+import io.github.drawjustin.kairos.platform.dto.AiUsageModelBreakdownOutput
 import io.github.drawjustin.kairos.platform.dto.ApiKeyIssueOutput
 import io.github.drawjustin.kairos.platform.dto.ApiKeyOutput
 import io.github.drawjustin.kairos.platform.dto.CreateApiKeyRequest
 import io.github.drawjustin.kairos.platform.dto.CreateProjectRequest
 import io.github.drawjustin.kairos.platform.dto.CreateTenantRequest
 import io.github.drawjustin.kairos.platform.dto.CreateTenantUserRequest
+import io.github.drawjustin.kairos.platform.dto.ProjectAiUsageSummaryOutput
+import io.github.drawjustin.kairos.platform.dto.ProjectAiUsageSummaryQuery
 import io.github.drawjustin.kairos.platform.dto.ProjectOutput
 import io.github.drawjustin.kairos.platform.dto.TenantOutput
 import io.github.drawjustin.kairos.platform.dto.TenantUserOutput
@@ -27,6 +33,8 @@ import io.github.drawjustin.kairos.user.entity.User
 import io.github.drawjustin.kairos.user.entity.UserRole
 import io.github.drawjustin.kairos.user.repository.UserRepository
 import java.security.SecureRandom
+import java.time.Instant
+import java.time.temporal.ChronoUnit
 import java.util.Base64
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -38,6 +46,7 @@ class PlatformManagementService(
     private val tenantUserRepository: TenantUserRepository,
     private val projectRepository: ProjectRepository,
     private val apiKeyRepository: ApiKeyRepository,
+    private val aiUsageQueryRepository: AiUsageQueryRepository,
     private val userRepository: UserRepository,
     private val tokenHasher: TokenHasher,
 ) {
@@ -224,6 +233,39 @@ class PlatformManagementService(
             .map { it.toOutput() }
     }
 
+    @Transactional(readOnly = true)
+    fun getProjectAiUsageSummary(
+        principal: AuthenticatedUser,
+        projectId: Long,
+        query: ProjectAiUsageSummaryQuery,
+    ): ProjectAiUsageSummaryOutput {
+        val project = resolveManagedProject(principal, projectId)
+        val resolvedTo = query.to ?: Instant.now()
+        val resolvedFrom = query.from ?: resolvedTo.minus(DEFAULT_USAGE_LOOKBACK_DAYS, ChronoUnit.DAYS)
+        if (!resolvedFrom.isBefore(resolvedTo)) {
+            throw KairosException(KairosErrorCode.INVALID_INPUT, "from must be before to")
+        }
+
+        val resolvedProjectId = requireNotNull(project.id) { "Project id must exist" }
+        val summary = aiUsageQueryRepository.summarizeProjectUsage(
+            projectId = resolvedProjectId,
+            from = resolvedFrom,
+            to = resolvedTo,
+        )
+        val byModel = aiUsageQueryRepository.summarizeProjectUsageByModel(
+            projectId = resolvedProjectId,
+            from = resolvedFrom,
+            to = resolvedTo,
+        )
+
+        return summary.toProjectAiUsageSummaryOutput(
+            projectId = resolvedProjectId,
+            from = resolvedFrom,
+            to = resolvedTo,
+            byModel = byModel.map { it.toOutput() },
+        )
+    }
+
     private fun resolveTenantForRole(
         principal: AuthenticatedUser,
         tenantId: Long,
@@ -322,6 +364,36 @@ class PlatformManagementService(
         createdAt = requireNotNull(createdAt) { "ApiKey createdAt must exist" },
     )
 
+    private fun AiUsageSummaryRow.toProjectAiUsageSummaryOutput(
+        projectId: Long,
+        from: Instant,
+        to: Instant,
+        byModel: List<AiUsageModelBreakdownOutput>,
+    ): ProjectAiUsageSummaryOutput = ProjectAiUsageSummaryOutput(
+        projectId = projectId,
+        from = from,
+        to = to,
+        totalRequests = totalRequests,
+        successRequests = successRequests,
+        failedRequests = failedRequests,
+        inputTokens = inputTokens,
+        outputTokens = outputTokens,
+        totalTokens = totalTokens,
+        byModel = byModel,
+    )
+
+    private fun AiUsageModelBreakdownRow.toOutput(): AiUsageModelBreakdownOutput =
+        AiUsageModelBreakdownOutput(
+            provider = provider,
+            model = model,
+            totalRequests = totalRequests,
+            successRequests = successRequests,
+            failedRequests = failedRequests,
+            inputTokens = inputTokens,
+            outputTokens = outputTokens,
+            totalTokens = totalTokens,
+        )
+
     private fun generateApiKey(): String {
         // URL-safe base64를 써서 헤더/환경변수/로그 마스킹 처리와 함께 쓰기 쉽게 만든다.
         val randomBytes = ByteArray(24)
@@ -332,6 +404,7 @@ class PlatformManagementService(
 
     companion object {
         private const val KEY_PREVIEW_LENGTH = 18
+        private const val DEFAULT_USAGE_LOOKBACK_DAYS = 30L
 
         private fun ownerRoles() = listOf(TenantUserRole.OWNER)
 
