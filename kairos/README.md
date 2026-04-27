@@ -68,7 +68,7 @@ flowchart LR
 
 여기에 더해 project별로 허용된 **Context Source**를 provider별 tool/function schema로 변환하고, OpenAI `tool_call`, Claude `tool_use`, Gemini `functionCall` 흐름을 통해 내부 문서 검색 API를 호출하는 구조까지 확장했습니다.
 
-다음 단계에서는 `/api/v1/context/search` 같은 Context API를 추가해, 개발 AI 도구가 KAIROS를 통해 사내 개발 문서와 참조자료를 안전하게 검색할 수 있도록 확장합니다.
+또한 `/api/v1/context/sources`와 `/api/v1/context/search` Context API를 통해, 개발 AI 도구가 KAIROS를 거쳐 사용할 수 있는 source 목록을 확인하고 필요한 사내 개발 문서와 참조자료를 안전하게 검색할 수 있는 MVP 흐름을 제공합니다.
 
 ## 현재 구현된 범위
 
@@ -86,6 +86,8 @@ flowchart LR
 - project별 context source 등록, 조회, 연결 해제 API
 - context source를 공통 tool definition으로 변환하는 Tool Catalog
 - OpenAI, Claude, Gemini tool calling 흐름 지원
+- `/api/v1/context/sources` 기반 개발 AI용 context source catalog API
+- `/api/v1/context/search` 기반 개발 AI용 참조자료 검색 API
 - 내부 mock 문서 검색 API를 통한 MCP 확장 흐름 검증
 - Flyway 기반 PostgreSQL 스키마 관리
 - Swagger 문서화, traceId 기반 요청 로그, Testcontainers 통합 테스트
@@ -214,6 +216,8 @@ sequenceDiagram
     participant Docs as Internal Dev Docs
 
     Dev->>Agent: "개발 사내 문서 참고해서 API 만들어줘"
+    Agent->>K: context/sources 요청
+    K-->>Agent: 사용 가능한 source 목록 반환
     Agent->>K: context/search 요청
     K->>K: 사용자 인증 / project scope / allowed source 검사
     K->>M: 권한 context 포함해 문서 검색 요청
@@ -323,15 +327,14 @@ KAIROS가 진짜로 풀고 싶은 문제는 다음과 같습니다.
 
 가까운 단계에서는 다음을 우선 만듭니다.
 
-1. `/api/v1/context/search` Context API 추가
-2. 내부 mock tool을 별도 MCP gateway 또는 사내 검색 서버로 분리
-3. context source별 인증 방식, timeout, retry, error handling 추가
-4. 사용자별 문서 접근 권한과 보안 등급 정책 추가
-5. context search audit log 추가
-6. API key별 rate limit, quota, budget 정책
-7. provider timeout, retry, fallback 정책
-8. Prometheus/Grafana 기반 관측 지표 추가
-9. 운영 대시보드와 사용량 시각화
+1. 내부 mock tool을 별도 MCP gateway 또는 사내 검색 서버로 분리
+2. context source별 인증 방식, timeout, retry, error handling 추가
+3. 사용자별 문서 접근 권한과 보안 등급 정책 추가
+4. context search audit log 추가
+5. API key별 rate limit, quota, budget 정책
+6. provider timeout, retry, fallback 정책
+7. Prometheus/Grafana 기반 관측 지표 추가
+8. 운영 대시보드와 사용량 시각화
 
 그다음 단계에서는 아래로 확장할 수 있습니다.
 

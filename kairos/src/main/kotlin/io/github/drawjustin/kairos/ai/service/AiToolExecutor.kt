@@ -1,6 +1,7 @@
 package io.github.drawjustin.kairos.ai.service
 
 import com.fasterxml.jackson.databind.ObjectMapper
+import io.github.drawjustin.kairos.ai.dto.AiToolExecutionRequest
 import io.github.drawjustin.kairos.ai.tool.AiToolDefinition
 import io.github.drawjustin.kairos.common.error.KairosErrorCode
 import io.github.drawjustin.kairos.common.error.KairosException
@@ -19,12 +20,20 @@ class AiToolExecutor(
 
     fun execute(tool: AiToolDefinition, arguments: String?): String {
         val query = parseQuery(arguments)
+        return executeQuery(tool, query)
+    }
+
+    fun executeQuery(tool: AiToolDefinition, query: String): String {
+        val searchQuery = query.trim()
+        if (searchQuery.isBlank()) {
+            throw KairosException(KairosErrorCode.AI_TOOL_EXECUTION_FAILED, "Tool query is required")
+        }
         return try {
             restClient.post()
                 .uri(tool.sourceUri)
                 .contentType(MediaType.APPLICATION_JSON)
                 .accept(MediaType.APPLICATION_JSON)
-                .body(AiToolExecutionRequest(query = query))
+                .body(AiToolExecutionRequest(query = searchQuery))
                 .retrieve()
                 .body<String>()
                 ?: throw KairosException(KairosErrorCode.AI_TOOL_EXECUTION_FAILED)
@@ -50,7 +59,3 @@ class AiToolExecutor(
         return query
     }
 }
-
-data class AiToolExecutionRequest(
-    val query: String,
-)
