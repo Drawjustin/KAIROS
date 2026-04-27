@@ -70,6 +70,8 @@ flowchart LR
 
 또한 `/api/v1/context/sources`와 `/api/v1/context/search` Context API를 통해, 개발 AI 도구가 KAIROS를 거쳐 사용할 수 있는 source 목록을 확인하고 필요한 사내 개발 문서와 참조자료를 안전하게 검색할 수 있는 MVP 흐름을 제공합니다.
 
+서버 직접 연결이 필요한 MCP client를 위해 `/mcp` HTTP JSON-RPC endpoint도 제공합니다. 이 endpoint는 JWT 인증을 거친 뒤 `initialize`, `ping`, `tools/list`, `tools/call`을 처리하며, `kairos_list_context_sources`와 `kairos_search_context` tool을 기존 Context Search 정책 계층에 연결합니다.
+
 ## 현재 구현된 범위
 
 - JWT 기반 회원가입, 로그인, refresh token 인증 흐름
@@ -88,6 +90,7 @@ flowchart LR
 - OpenAI, Claude, Gemini tool calling 흐름 지원
 - `/api/v1/context/sources` 기반 개발 AI용 context source catalog API
 - `/api/v1/context/search` 기반 개발 AI용 참조자료 검색 API
+- KAIROS 서버가 직접 MCP tool을 노출하는 `/mcp` HTTP JSON-RPC endpoint
 - 내부 mock 문서 검색 API를 통한 MCP 확장 흐름 검증
 - Flyway 기반 PostgreSQL 스키마 관리
 - Swagger 문서화, traceId 기반 요청 로그, Testcontainers 통합 테스트

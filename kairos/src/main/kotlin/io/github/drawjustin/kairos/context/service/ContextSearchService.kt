@@ -11,6 +11,7 @@ import io.github.drawjustin.kairos.common.error.KairosException
 import io.github.drawjustin.kairos.context.dto.ContextSearchRequest
 import io.github.drawjustin.kairos.context.dto.ContextSearchResult
 import io.github.drawjustin.kairos.context.dto.ContextSourceCatalogItem
+import io.github.drawjustin.kairos.platform.dto.ProjectOutput
 import io.github.drawjustin.kairos.project.entity.Project
 import io.github.drawjustin.kairos.project.repository.ProjectRepository
 import io.github.drawjustin.kairos.project.type.ProjectStatus
@@ -28,6 +29,16 @@ class ContextSearchService(
     private val aiToolExecutor: AiToolExecutor,
     private val objectMapper: ObjectMapper,
 ) {
+    @Transactional(readOnly = true)
+    fun listProjects(principal: AuthenticatedUser): List<ProjectOutput> {
+        val projects = if (principal.role == UserRole.ADMIN) {
+            projectRepository.findAllByDeletedAtIsNullOrderByCreatedAtAsc()
+        } else {
+            projectRepository.findAccessibleProjectsByUserId(principal.id)
+        }
+        return projects.map { it.toOutput() }
+    }
+
     @Transactional(readOnly = true)
     fun listSources(principal: AuthenticatedUser, projectId: Long): List<ContextSourceCatalogItem> {
         val project = resolveAccessibleProject(principal, projectId)
@@ -97,6 +108,16 @@ class ContextSearchService(
             name = name,
             type = sourceType,
             description = description,
+        )
+
+    private fun Project.toOutput(): ProjectOutput =
+        ProjectOutput(
+            id = requireNotNull(id) { "Project id must exist" },
+            tenantId = requireNotNull(tenant.id) { "Project tenant id must exist" },
+            name = name,
+            environment = environment,
+            status = status,
+            createdAt = requireNotNull(createdAt) { "Project createdAt must exist" },
         )
 
     private fun String.toSearchResults(tool: AiToolDefinition): List<ContextSearchResult> {

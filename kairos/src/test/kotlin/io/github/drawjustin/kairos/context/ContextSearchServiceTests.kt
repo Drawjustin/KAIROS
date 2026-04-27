@@ -15,6 +15,7 @@ import io.github.drawjustin.kairos.project.repository.ProjectRepository
 import io.github.drawjustin.kairos.tenant.entity.Tenant
 import io.github.drawjustin.kairos.tenant.repository.TenantUserRepository
 import io.github.drawjustin.kairos.user.type.UserRole
+import java.time.Instant
 import java.util.Optional
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
@@ -34,6 +35,48 @@ class ContextSearchServiceTests {
         aiToolExecutor = aiToolExecutor,
         objectMapper = jacksonObjectMapper(),
     )
+
+    @Test
+    fun `admin can list all projects for MCP project selection`() {
+        val principal = AuthenticatedUser(id = 1, email = "admin@example.com", role = UserRole.ADMIN)
+        val project = Project(
+            id = 10,
+            tenant = Tenant(id = 1, name = "platform"),
+            name = "KAIROS",
+        ).apply {
+            createdAt = Instant.parse("2026-04-27T00:00:00Z")
+        }
+
+        given(projectRepository.findAllByDeletedAtIsNullOrderByCreatedAtAsc()).willReturn(listOf(project))
+
+        val result = service.listProjects(principal)
+
+        assertThat(result).hasSize(1)
+        assertThat(result.single().id).isEqualTo(10)
+        assertThat(result.single().name).isEqualTo("KAIROS")
+        assertThat(result.single().tenantId).isEqualTo(1)
+    }
+
+    @Test
+    fun `user can list only accessible projects for MCP project selection`() {
+        val principal = AuthenticatedUser(id = 2, email = "dev@example.com", role = UserRole.USER)
+        val project = Project(
+            id = 20,
+            tenant = Tenant(id = 3, name = "product"),
+            name = "Wadada",
+        ).apply {
+            createdAt = Instant.parse("2026-04-27T00:00:00Z")
+        }
+
+        given(projectRepository.findAccessibleProjectsByUserId(2)).willReturn(listOf(project))
+
+        val result = service.listProjects(principal)
+
+        assertThat(result).hasSize(1)
+        assertThat(result.single().id).isEqualTo(20)
+        assertThat(result.single().name).isEqualTo("Wadada")
+        assertThat(result.single().tenantId).isEqualTo(3)
+    }
 
     @Test
     fun `tenant member can list project context source catalog`() {

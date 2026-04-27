@@ -3,6 +3,7 @@ package io.github.drawjustin.kairos.context.dto
 import io.github.drawjustin.kairos.common.api.BaseOutput
 import io.github.drawjustin.kairos.context.type.ContextSearchPurpose
 import io.github.drawjustin.kairos.context.type.ContextSourceType
+import io.github.drawjustin.kairos.platform.dto.ProjectOutput
 import io.swagger.v3.oas.annotations.media.Schema
 import jakarta.validation.constraints.NotBlank
 import jakarta.validation.constraints.NotNull
@@ -34,6 +35,11 @@ data class ContextSearchResponse(
 data class ContextSourcesResponse(
     @field:Schema(description = "project에서 사용할 수 있는 context source 목록")
     val result: List<ContextSourceCatalogItem>,
+) : BaseOutput()
+
+data class ContextProjectsResponse(
+    @field:Schema(description = "현재 사용자가 접근할 수 있는 project 목록")
+    val result: List<ProjectOutput>,
 ) : BaseOutput()
 
 data class ContextSourceCatalogItem(

@@ -2,6 +2,7 @@ package io.github.drawjustin.kairos.context.controller
 
 import io.github.drawjustin.kairos.auth.security.AuthenticatedUser
 import io.github.drawjustin.kairos.common.api.BaseOutput
+import io.github.drawjustin.kairos.context.dto.ContextProjectsResponse
 import io.github.drawjustin.kairos.context.dto.ContextSearchRequest
 import io.github.drawjustin.kairos.context.dto.ContextSearchResponse
 import io.github.drawjustin.kairos.context.dto.ContextSourcesResponse
@@ -30,6 +31,32 @@ import org.springframework.web.bind.annotation.RestController
 class ContextSearchController(
     private val contextSearchService: ContextSearchService,
 ) {
+    @GetMapping("/projects")
+    @Operation(
+        summary = "사용 가능한 project 목록 조회",
+        description = "개발 AI 도구가 사용자의 요청에 나온 project 이름을 projectId로 해석할 수 있도록 현재 사용자가 접근 가능한 project 목록을 조회한다.",
+    )
+    @SecurityRequirement(name = "bearerAuth")
+    @ApiResponses(
+        value = [
+            ApiResponse(
+                responseCode = "200",
+                description = "project 목록 조회 성공",
+                headers = [Header(name = "X-Trace-Id", description = "요청 추적용 trace identifier")],
+            ),
+            ApiResponse(
+                responseCode = "401",
+                description = "access token이 없거나 유효하지 않음",
+                content = [Content(schema = Schema(implementation = BaseOutput::class))],
+            ),
+        ],
+    )
+    fun listProjects(
+        @AuthenticationPrincipal principal: AuthenticatedUser,
+    ): ContextProjectsResponse = ContextProjectsResponse(
+        result = contextSearchService.listProjects(principal),
+    )
+
     @GetMapping("/sources")
     @Operation(
         summary = "사용 가능한 context source 목록 조회",
