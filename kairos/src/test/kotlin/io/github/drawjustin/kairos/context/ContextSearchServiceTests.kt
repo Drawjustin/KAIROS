@@ -8,6 +8,7 @@ import io.github.drawjustin.kairos.auth.security.AuthenticatedUser
 import io.github.drawjustin.kairos.common.error.KairosErrorCode
 import io.github.drawjustin.kairos.common.error.KairosException
 import io.github.drawjustin.kairos.context.dto.ContextSearchRequest
+import io.github.drawjustin.kairos.context.service.ContextSearchLoggingService
 import io.github.drawjustin.kairos.context.service.ContextSearchService
 import io.github.drawjustin.kairos.context.type.ContextSourceType
 import io.github.drawjustin.kairos.project.entity.Project
@@ -22,17 +23,20 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 import org.mockito.BDDMockito.given
 import org.mockito.Mockito.mock
+import org.mockito.Mockito.mockingDetails
 
 class ContextSearchServiceTests {
     private val projectRepository = mock(ProjectRepository::class.java)
     private val tenantUserRepository = mock(TenantUserRepository::class.java)
     private val projectContextToolService = mock(ProjectContextToolService::class.java)
     private val aiToolExecutor = mock(AiToolExecutor::class.java)
+    private val contextSearchLoggingService = mock(ContextSearchLoggingService::class.java)
     private val service = ContextSearchService(
         projectRepository = projectRepository,
         tenantUserRepository = tenantUserRepository,
         projectContextToolService = projectContextToolService,
         aiToolExecutor = aiToolExecutor,
+        contextSearchLoggingService = contextSearchLoggingService,
         objectMapper = jacksonObjectMapper(),
     )
 
@@ -162,6 +166,19 @@ class ContextSearchServiceTests {
         assertThat(result.single().source).isEqualTo("engineering-handbook")
         assertThat(result.single().contextSourceId).isEqualTo(3)
         assertThat(result.single().contextSourceName).isEqualTo("dev_docs_search_3")
+        val invocation = contextSearchLoggingService.recordSuccessInvocation()
+        assertThat(invocation.arguments[0]).isEqualTo(principal)
+        assertThat(invocation.arguments[1]).isEqualTo(project)
+        assertThat(invocation.arguments[2]).isEqualTo(
+            ContextSearchRequest(
+                projectId = 10,
+                query = " API 응답 규칙 ",
+                contextSourceIds = listOf(3),
+            ),
+        )
+        assertThat(invocation.arguments[3]).isEqualTo(listOf(3L))
+        assertThat(invocation.arguments[4]).isEqualTo(1)
+        assertThat(invocation.arguments[5] as Long).isGreaterThanOrEqualTo(0)
     }
 
     @Test
@@ -196,6 +213,19 @@ class ContextSearchServiceTests {
         }
 
         assertThat(exception.errorCode).isEqualTo(KairosErrorCode.AI_TOOL_NOT_ALLOWED)
+        val invocation = contextSearchLoggingService.recordFailureInvocation()
+        assertThat(invocation.arguments[0]).isEqualTo(principal)
+        assertThat(invocation.arguments[1]).isEqualTo(project)
+        assertThat(invocation.arguments[2]).isEqualTo(
+            ContextSearchRequest(
+                projectId = 10,
+                query = "API 응답 규칙",
+                contextSourceIds = listOf(999),
+            ),
+        )
+        assertThat(invocation.arguments[3]).isEqualTo(emptyList<Long>())
+        assertThat(invocation.arguments[4] as Long).isGreaterThanOrEqualTo(0)
+        assertThat(invocation.arguments[5]).isEqualTo(KairosErrorCode.AI_TOOL_NOT_ALLOWED.code)
     }
 
     @Test
@@ -222,4 +252,10 @@ class ContextSearchServiceTests {
 
         assertThat(exception.errorCode).isEqualTo(KairosErrorCode.PROJECT_ACCESS_DENIED)
     }
+
+    private fun ContextSearchLoggingService.recordSuccessInvocation() =
+        mockingDetails(this).invocations.single { it.method.name == "recordSuccess" }
+
+    private fun ContextSearchLoggingService.recordFailureInvocation() =
+        mockingDetails(this).invocations.single { it.method.name == "recordFailure" }
 }

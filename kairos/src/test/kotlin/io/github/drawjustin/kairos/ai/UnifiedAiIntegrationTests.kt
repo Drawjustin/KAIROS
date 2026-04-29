@@ -13,6 +13,8 @@ import io.github.drawjustin.kairos.ai.dto.ChatMessageResponse
 import io.github.drawjustin.kairos.ai.dto.ChatUsageResponse
 import io.github.drawjustin.kairos.ai.provider.ProviderAdapter
 import io.github.drawjustin.kairos.ai.provider.ProviderRouter
+import io.github.drawjustin.kairos.ai.service.AiToolExecutionContext
+import io.github.drawjustin.kairos.ai.tool.AiToolDefinition
 import io.github.drawjustin.kairos.ai.type.ChatRole
 import io.github.drawjustin.kairos.auth.dto.AuthOutput
 import io.github.drawjustin.kairos.auth.dto.AuthResponse
@@ -37,6 +39,8 @@ import io.github.drawjustin.kairos.user.type.UserRole
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import org.mockito.ArgumentMatchers.any
+import org.mockito.ArgumentMatchers.eq
 import org.mockito.BDDMockito.given
 import org.mockito.Mockito.mock
 import org.springframework.beans.factory.annotation.Autowired
@@ -92,7 +96,7 @@ class UnifiedAiIntegrationTests : IntegrationTestSupport() {
     fun setUp() {
         // soft delete된 row까지 포함해 초기 상태를 맞춰 API key 인증 테스트가 흔들리지 않게 한다.
         jdbcTemplate.execute(
-            "truncate table ai_usage_log, api_key, project_context_source, context_source, project_allowed_model, project, tenant_user, tenant, refresh_session, users restart identity cascade",
+            "truncate table context_search_log, ai_usage_log, api_key, project_context_source, context_source, project_allowed_model, project, tenant_user, tenant, refresh_session, users restart identity cascade",
         )
         providerAdapter = mock(ProviderAdapter::class.java)
     }
@@ -123,7 +127,13 @@ class UnifiedAiIntegrationTests : IntegrationTestSupport() {
         )
 
         given(providerRouter.route(AiModel.GPT_4O_MINI)).willReturn(providerAdapter)
-        given(providerAdapter.chatCompletion(enrichedRequest, emptyList()))
+        given(
+            providerAdapter.chatCompletion(
+                eqNotNull(enrichedRequest),
+                eqNotNull(emptyList<AiToolDefinition>()),
+                any(AiToolExecutionContext::class.java),
+            ),
+        )
             .willReturn(
                 ChatCompletionResponse(
                     id = "chatcmpl_test_123",
@@ -274,7 +284,13 @@ class UnifiedAiIntegrationTests : IntegrationTestSupport() {
         )
 
         given(providerRouter.route(AiModel.GPT_4O_MINI)).willReturn(providerAdapter)
-        given(providerAdapter.chatCompletion(enrichedRequest, emptyList()))
+        given(
+            providerAdapter.chatCompletion(
+                eqNotNull(enrichedRequest),
+                eqNotNull(emptyList<AiToolDefinition>()),
+                any(AiToolExecutionContext::class.java),
+            ),
+        )
             .willThrow(KairosException(KairosErrorCode.AI_PROVIDER_ERROR))
 
         mockMvc.perform(
@@ -302,6 +318,8 @@ class UnifiedAiIntegrationTests : IntegrationTestSupport() {
         userRepository.save(adminUser)
         return login(LoginRequest(email = email, password = "password123"))
     }
+
+    private fun <T> eqNotNull(value: T): T = eq(value) ?: value
 
     private fun register(request: RegisterRequest): AuthOutput {
         val result = mockMvc.perform(

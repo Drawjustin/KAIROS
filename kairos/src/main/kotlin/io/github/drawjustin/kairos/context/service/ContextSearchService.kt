@@ -27,6 +27,7 @@ class ContextSearchService(
     private val tenantUserRepository: TenantUserRepository,
     private val projectContextToolService: ProjectContextToolService,
     private val aiToolExecutor: AiToolExecutor,
+    private val contextSearchLoggingService: ContextSearchLoggingService,
     private val objectMapper: ObjectMapper,
 ) {
     @Transactional(readOnly = true)
@@ -49,22 +50,56 @@ class ContextSearchService(
 
     @Transactional(readOnly = true)
     fun search(principal: AuthenticatedUser, request: ContextSearchRequest): List<ContextSearchResult> {
+        val startedAt = System.nanoTime()
+        var searchedContextSourceIds = emptyList<Long>()
         val project = resolveAccessibleProject(principal, request.projectId)
         val projectId = requireNotNull(project.id) { "Project id must exist" }
-        val query = request.query.trim()
-        val tools = projectContextToolService.getProjectTools(projectId)
-        val searchTools = tools.filterByRequestedSources(request.contextSourceIds)
+        return try {
+            val query = request.query.trim()
+            val tools = projectContextToolService.getProjectTools(projectId)
+            val searchTools = tools.filterByRequestedSources(request.contextSourceIds)
+            searchedContextSourceIds = searchTools.map { it.sourceId }
+            val results = searchTools
+                .flatMap { tool ->
+                    val rawResponse = aiToolExecutor.executeQuery(tool, query)
+                    rawResponse.toSearchResults(tool)
+                }
+                .sortedWith(
+                    compareByDescending<ContextSearchResult> { it.score }
+                        .thenBy { it.title }
+                        .thenBy { it.contextSourceName },
+                )
 
-        return searchTools
-            .flatMap { tool ->
-                val rawResponse = aiToolExecutor.executeQuery(tool, query)
-                rawResponse.toSearchResults(tool)
-            }
-            .sortedWith(
-                compareByDescending<ContextSearchResult> { it.score }
-                    .thenBy { it.title }
-                    .thenBy { it.contextSourceName },
+            contextSearchLoggingService.recordSuccess(
+                principal = principal,
+                project = project,
+                request = request,
+                searchedContextSourceIds = searchedContextSourceIds,
+                resultCount = results.size,
+                latencyMs = elapsedMillis(startedAt),
             )
+            results
+        } catch (exception: KairosException) {
+            contextSearchLoggingService.recordFailure(
+                principal = principal,
+                project = project,
+                request = request,
+                searchedContextSourceIds = searchedContextSourceIds,
+                latencyMs = elapsedMillis(startedAt),
+                errorCode = exception.errorCode.code,
+            )
+            throw exception
+        } catch (exception: Exception) {
+            contextSearchLoggingService.recordFailure(
+                principal = principal,
+                project = project,
+                request = request,
+                searchedContextSourceIds = searchedContextSourceIds,
+                latencyMs = elapsedMillis(startedAt),
+                errorCode = KairosErrorCode.INTERNAL_SERVER_ERROR.code,
+            )
+            throw exception
+        }
     }
 
     private fun resolveAccessibleProject(principal: AuthenticatedUser, projectId: Long): Project {
@@ -119,6 +154,9 @@ class ContextSearchService(
             status = status,
             createdAt = requireNotNull(createdAt) { "Project createdAt must exist" },
         )
+
+    private fun elapsedMillis(startedAt: Long): Long =
+        (System.nanoTime() - startedAt) / 1_000_000
 
     private fun String.toSearchResults(tool: AiToolDefinition): List<ContextSearchResult> {
         val root = try {

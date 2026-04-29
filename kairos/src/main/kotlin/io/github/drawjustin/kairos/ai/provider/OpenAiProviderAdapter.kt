@@ -17,6 +17,7 @@ import io.github.drawjustin.kairos.ai.provider.openai.OpenAiTool
 import io.github.drawjustin.kairos.ai.provider.openai.OpenAiToolCall
 import io.github.drawjustin.kairos.ai.provider.openai.OpenAiToolFunction
 import io.github.drawjustin.kairos.ai.service.AiToolExecutor
+import io.github.drawjustin.kairos.ai.service.AiToolExecutionContext
 import io.github.drawjustin.kairos.ai.tool.AiToolDefinition
 import io.github.drawjustin.kairos.ai.type.AiProvider
 import io.github.drawjustin.kairos.ai.type.ChatRole
@@ -39,7 +40,11 @@ class OpenAiProviderAdapter(
 
     override fun supports(model: AiModel): Boolean = model.provider == AiProvider.OPENAI
 
-    override fun chatCompletion(request: ChatCompletionRequest, tools: List<AiToolDefinition>): ChatCompletionResponse {
+    override fun chatCompletion(
+        request: ChatCompletionRequest,
+        tools: List<AiToolDefinition>,
+        toolExecutionContext: AiToolExecutionContext?,
+    ): ChatCompletionResponse {
         val apiKey = openAiProperties.apiKey.trim()
         if (apiKey.isBlank()) {
             throw KairosException(KairosErrorCode.AI_PROVIDER_NOT_CONFIGURED)
@@ -57,7 +62,7 @@ class OpenAiProviderAdapter(
             } else {
                 val followUpMessages = messages +
                     response.assistantToolCallMessage() +
-                    pendingToolCalls.map { it.toProviderToolResult(tools) }
+                    pendingToolCalls.map { it.toProviderToolResult(tools, toolExecutionContext) }
                 sendProviderRequest(
                     apiKey = apiKey,
                     request = request.toProviderRequest(messages = followUpMessages, tools = tools),
@@ -129,10 +134,17 @@ class OpenAiProviderAdapter(
         )
     }
 
-    private fun OpenAiToolCall.toProviderToolResult(tools: List<AiToolDefinition>): OpenAiChatMessage {
+    private fun OpenAiToolCall.toProviderToolResult(
+        tools: List<AiToolDefinition>,
+        context: AiToolExecutionContext?,
+    ): OpenAiChatMessage {
         val tool = tools.firstOrNull { it.name == function.name }
             ?: throw KairosException(KairosErrorCode.AI_TOOL_NOT_ALLOWED)
-        val result = aiToolExecutor.execute(tool = tool, arguments = function.arguments)
+        val result = aiToolExecutor.execute(
+            tool = tool,
+            arguments = function.arguments,
+            context = context,
+        )
         return OpenAiChatMessage(
             role = "tool",
             content = result,

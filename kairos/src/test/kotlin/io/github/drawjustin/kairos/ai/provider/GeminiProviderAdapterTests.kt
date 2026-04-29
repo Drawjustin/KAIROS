@@ -8,9 +8,11 @@ import io.github.drawjustin.kairos.ai.service.AiToolExecutor
 import io.github.drawjustin.kairos.ai.tool.AiToolDefinition
 import io.github.drawjustin.kairos.ai.type.AiModel
 import io.github.drawjustin.kairos.ai.type.ChatRole
+import io.github.drawjustin.kairos.context.service.ContextSearchLoggingService
 import io.github.drawjustin.kairos.context.type.ContextSourceType
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
+import org.mockito.Mockito.mock
 import org.springframework.http.HttpMethod
 import org.springframework.http.MediaType
 import org.springframework.test.web.client.MockRestServiceServer
@@ -33,7 +35,11 @@ class GeminiProviderAdapterTests {
                 apiKey = "gemini-api-key",
             ),
             restClientBuilder = restClientBuilder,
-            aiToolExecutor = AiToolExecutor(objectMapper, restClientBuilder),
+            aiToolExecutor = AiToolExecutor(
+                objectMapper = objectMapper,
+                contextSearchLoggingService = mock(ContextSearchLoggingService::class.java),
+                restClientBuilder = restClientBuilder,
+            ),
             objectMapper = objectMapper,
         )
         val tool = AiToolDefinition(

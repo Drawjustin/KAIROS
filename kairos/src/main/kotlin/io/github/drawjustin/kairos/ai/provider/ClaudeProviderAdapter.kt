@@ -14,6 +14,7 @@ import io.github.drawjustin.kairos.ai.provider.claude.AnthropicMessageRequest
 import io.github.drawjustin.kairos.ai.provider.claude.AnthropicMessageResponse
 import io.github.drawjustin.kairos.ai.provider.claude.AnthropicTool
 import io.github.drawjustin.kairos.ai.service.AiToolExecutor
+import io.github.drawjustin.kairos.ai.service.AiToolExecutionContext
 import io.github.drawjustin.kairos.ai.tool.AiToolDefinition
 import io.github.drawjustin.kairos.ai.type.AiProvider
 import io.github.drawjustin.kairos.ai.type.ChatRole
@@ -37,7 +38,11 @@ class ClaudeProviderAdapter(
 
     override fun supports(model: AiModel): Boolean = model.provider == AiProvider.CLAUDE
 
-    override fun chatCompletion(request: ChatCompletionRequest, tools: List<AiToolDefinition>): ChatCompletionResponse {
+    override fun chatCompletion(
+        request: ChatCompletionRequest,
+        tools: List<AiToolDefinition>,
+        toolExecutionContext: AiToolExecutionContext?,
+    ): ChatCompletionResponse {
         val apiKey = anthropicProperties.apiKey.trim()
         if (apiKey.isBlank()) {
             throw KairosException(KairosErrorCode.AI_PROVIDER_NOT_CONFIGURED)
@@ -61,7 +66,7 @@ class ClaudeProviderAdapter(
                             mapOf(
                                 "type" to "tool_result",
                                 "tool_use_id" to toolCall.id,
-                                "content" to toolCall.executeTool(tools),
+                                "content" to toolCall.executeTool(tools, toolExecutionContext),
                             )
                         },
                     )
@@ -135,12 +140,14 @@ class ClaudeProviderAdapter(
 
     private fun AnthropicContentBlock.executeTool(
         tools: List<AiToolDefinition>,
+        context: AiToolExecutionContext?,
     ): String {
         val tool = tools.firstOrNull { it.name == name }
             ?: throw KairosException(KairosErrorCode.AI_TOOL_NOT_ALLOWED)
         return aiToolExecutor.execute(
             tool = tool,
             arguments = objectMapper.writeValueAsString(input.orEmpty()),
+            context = context,
         )
     }
 

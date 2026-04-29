@@ -7,6 +7,7 @@ import io.github.drawjustin.kairos.ai.provider.ProviderRouter
 import io.github.drawjustin.kairos.ai.type.ChatRole
 import io.github.drawjustin.kairos.common.error.KairosErrorCode
 import io.github.drawjustin.kairos.common.error.KairosException
+import io.github.drawjustin.kairos.context.type.ContextSearchPurpose
 import io.github.drawjustin.kairos.project.repository.ProjectAllowedModelRepository
 import org.springframework.stereotype.Service
 
@@ -40,7 +41,15 @@ class UnifiedAiService(
                 request = enrichedRequest,
             )
             val providerAdapter = providerRouter.route(enrichedRequest.model)
-            providerAdapter.chatCompletion(enrichedRequest, tools)
+            providerAdapter.chatCompletion(
+                request = enrichedRequest,
+                tools = tools,
+                toolExecutionContext = AiToolExecutionContext(
+                    userId = requireNotNull(credential.createdByUser.id) { "API key creator id must exist" },
+                    project = credential.project,
+                    purpose = ContextSearchPurpose.INTERNAL_QA,
+                ),
+            )
         } catch (exception: KairosException) {
             aiUsageLoggingService.recordFailure(
                 apiKey = credential,

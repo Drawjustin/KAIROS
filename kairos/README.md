@@ -90,6 +90,7 @@ flowchart LR
 - OpenAI, Claude, Gemini tool calling 흐름 지원
 - `/api/v1/context/sources` 기반 개발 AI용 context source catalog API
 - `/api/v1/context/search` 기반 개발 AI용 참조자료 검색 API
+- context search 성공/실패 감사 로그 저장
 - KAIROS 서버가 직접 MCP tool을 노출하는 `/mcp` HTTP JSON-RPC endpoint
 - 내부 mock 문서 검색 API를 통한 MCP 확장 흐름 검증
 - Flyway 기반 PostgreSQL 스키마 관리
@@ -333,11 +334,10 @@ KAIROS가 진짜로 풀고 싶은 문제는 다음과 같습니다.
 1. 내부 mock tool을 별도 MCP gateway 또는 사내 검색 서버로 분리
 2. context source별 인증 방식, timeout, retry, error handling 추가
 3. 사용자별 문서 접근 권한과 보안 등급 정책 추가
-4. context search audit log 추가
-5. API key별 rate limit, quota, budget 정책
-6. provider timeout, retry, fallback 정책
-7. Prometheus/Grafana 기반 관측 지표 추가
-8. 운영 대시보드와 사용량 시각화
+4. API key별 rate limit, quota, budget 정책
+5. provider timeout, retry, fallback 정책
+6. Prometheus/Grafana 기반 관측 지표 추가
+7. 운영 대시보드와 사용량 시각화
 
 그다음 단계에서는 아래로 확장할 수 있습니다.
 

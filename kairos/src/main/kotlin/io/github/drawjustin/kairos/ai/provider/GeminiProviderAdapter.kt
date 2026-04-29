@@ -22,6 +22,7 @@ import io.github.drawjustin.kairos.ai.provider.gemini.GeminiPart
 import io.github.drawjustin.kairos.ai.provider.gemini.GeminiTool
 import io.github.drawjustin.kairos.ai.provider.gemini.GeminiUsageMetadata
 import io.github.drawjustin.kairos.ai.service.AiToolExecutor
+import io.github.drawjustin.kairos.ai.service.AiToolExecutionContext
 import io.github.drawjustin.kairos.ai.tool.AiToolDefinition
 import io.github.drawjustin.kairos.ai.type.AiProvider
 import io.github.drawjustin.kairos.ai.type.ChatRole
@@ -45,7 +46,11 @@ class GeminiProviderAdapter(
 
     override fun supports(model: AiModel): Boolean = model.provider == AiProvider.GEMINI
 
-    override fun chatCompletion(request: ChatCompletionRequest, tools: List<AiToolDefinition>): ChatCompletionResponse {
+    override fun chatCompletion(
+        request: ChatCompletionRequest,
+        tools: List<AiToolDefinition>,
+        toolExecutionContext: AiToolExecutionContext?,
+    ): ChatCompletionResponse {
         val apiKey = geminiProperties.apiKey.trim()
         if (apiKey.isBlank()) {
             throw KairosException(KairosErrorCode.AI_PROVIDER_NOT_CONFIGURED)
@@ -62,7 +67,7 @@ class GeminiProviderAdapter(
                     ?: throw KairosException(KairosErrorCode.AI_PROVIDER_ERROR)
                 val toolResultContent = GeminiContent(
                     role = "function",
-                    parts = pendingToolCalls.map { it.toProviderToolResult(tools) },
+                    parts = pendingToolCalls.map { it.toProviderToolResult(tools, toolExecutionContext) },
                 )
                 sendProviderRequest(
                     apiKey = apiKey,
@@ -144,12 +149,16 @@ class GeminiProviderAdapter(
     private fun GeminiGenerateContentResponse.pendingToolCalls(): List<GeminiFunctionCall> =
         candidates.firstOrNull()?.content?.parts.orEmpty().mapNotNull { it.functionCall }
 
-    private fun GeminiFunctionCall.toProviderToolResult(tools: List<AiToolDefinition>): GeminiPart {
+    private fun GeminiFunctionCall.toProviderToolResult(
+        tools: List<AiToolDefinition>,
+        context: AiToolExecutionContext?,
+    ): GeminiPart {
         val tool = tools.firstOrNull { it.name == name }
             ?: throw KairosException(KairosErrorCode.AI_TOOL_NOT_ALLOWED)
         val result = aiToolExecutor.execute(
             tool = tool,
             arguments = objectMapper.writeValueAsString(args),
+            context = context,
         )
         return GeminiPart(
             functionResponse = GeminiFunctionResponse(

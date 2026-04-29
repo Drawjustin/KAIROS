@@ -2,6 +2,7 @@ package io.github.drawjustin.kairos.ai.provider
 
 import io.github.drawjustin.kairos.ai.dto.ChatCompletionRequest
 import io.github.drawjustin.kairos.ai.dto.ChatCompletionResponse
+import io.github.drawjustin.kairos.ai.service.AiToolExecutionContext
 import io.github.drawjustin.kairos.ai.tool.AiToolDefinition
 import io.github.drawjustin.kairos.ai.type.AiModel
 
@@ -12,5 +13,6 @@ interface ProviderAdapter {
     fun chatCompletion(
         request: ChatCompletionRequest,
         tools: List<AiToolDefinition> = emptyList(),
+        toolExecutionContext: AiToolExecutionContext? = null,
     ): ChatCompletionResponse
 }
