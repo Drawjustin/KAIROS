@@ -307,6 +307,52 @@ KAIROS는 AI 호출 결과를 `ai_usage_log`에 저장합니다.
 - `GET /api/platform/tenants/{tenantId}/ai-usage/summary`
 - `GET /api/platform/projects/{projectId}/ai-usage/summary`
 
+## 부하 테스트
+
+실제 OpenAI, Claude, Gemini를 직접 때리면 비용과 provider rate limit이 섞여 KAIROS 자체 병목을 보기 어렵습니다.  
+그래서 로컬 mock OpenAI provider와 k6 스크립트로 먼저 Tomcat thread, DB connection, usage logging, provider 호출 대기 시간을 확인합니다.
+
+1. mock OpenAI provider를 실행합니다.
+
+```bash
+MOCK_OPENAI_DELAY_MS=1000 npm run mock:openai
+```
+
+기본 endpoint는 다음과 같습니다.
+
+```text
+http://localhost:18080/v1/chat/completions
+```
+
+2. KAIROS를 mock provider로 연결해 실행합니다.
+
+```bash
+KAIROS_AI_OPENAI_BASE_URL=http://localhost:18080 \
+KAIROS_AI_OPENAI_API_KEY=mock-openai-key \
+./gradlew bootRun
+```
+
+3. KAIROS에서 project API key를 발급한 뒤 k6를 실행합니다.
+
+```bash
+KAIROS_API_KEY=kairos_sk_xxx \
+KAIROS_K6_TARGET_VUS=100 \
+KAIROS_K6_HOLD=2m \
+k6 run tools/load-test/k6-chat-completions.js
+```
+
+주요 환경 변수는 다음과 같습니다.
+
+- `MOCK_OPENAI_DELAY_MS`: mock provider 응답 지연 시간입니다. 외부 AI 응답이 느린 상황을 흉내 냅니다.
+- `MOCK_OPENAI_TOOL_CALL_MODE`: `never` 또는 `always`를 사용할 수 있습니다. `always`면 provider가 첫 응답에서 tool call을 반환합니다.
+- `KAIROS_K6_TARGET_VUS`: 동시에 요청을 보내는 가상 사용자 수입니다.
+- `KAIROS_K6_TIMEOUT`: k6 client가 KAIROS 응답을 기다리는 최대 시간입니다.
+- `KAIROS_K6_P95_MS`: k6 p95 latency threshold입니다.
+- `KAIROS_K6_MAX_FAILURE_RATE`: 허용 실패율 threshold입니다.
+
+이 테스트는 “KAIROS가 수백 명 동시 요청에서 어디부터 밀리는지”를 보기 위한 1차 안전장치입니다.  
+이후에는 provider timeout, bulkhead, rate limit, connection pool 튜닝을 적용하면서 같은 k6 스크립트로 전후 차이를 비교합니다.
+
 ## KAIROS의 포지션
 
 KAIROS는 단순한 멀티 LLM 프록시가 아닙니다.

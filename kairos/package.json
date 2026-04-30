@@ -3,7 +3,8 @@
   "private": true,
   "scripts": {
     "prepare": "husky",
-    "commitlint": "commitlint --config commitlint.config.cjs --edit"
+    "commitlint": "commitlint --config commitlint.config.cjs --edit",
+    "mock:openai": "node tools/load-test/mock-openai-provider.mjs"
   },
   "devDependencies": {
     "@commitlint/cli": "^19.8.0",

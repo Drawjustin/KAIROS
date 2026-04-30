@@ -48,7 +48,6 @@ class ContextSearchService(
             .map { it.toCatalogItem() }
     }
 
-    @Transactional(readOnly = true)
     fun search(principal: AuthenticatedUser, request: ContextSearchRequest): List<ContextSearchResult> {
         val startedAt = System.nanoTime()
         var searchedContextSourceIds = emptyList<Long>()
