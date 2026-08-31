@@ -8,6 +8,9 @@ import io.github.drawjustin.kairos.ai.type.ChatRole
 import io.github.drawjustin.kairos.common.error.KairosErrorCode
 import io.github.drawjustin.kairos.common.error.KairosException
 import io.github.drawjustin.kairos.context.type.ContextSearchPurpose
+import io.github.drawjustin.kairos.pii.service.PiiGuard
+import io.github.drawjustin.kairos.pii.type.PiiInspectionSource
+import io.github.drawjustin.kairos.project.entity.Project
 import io.github.drawjustin.kairos.project.repository.ProjectAllowedModelRepository
 import org.springframework.stereotype.Service
 
@@ -19,6 +22,7 @@ class UnifiedAiService(
     private val aiUsageLoggingService: AiUsageLoggingService,
     private val projectAllowedModelRepository: ProjectAllowedModelRepository,
     private val projectContextToolService: ProjectContextToolService,
+    private val piiGuard: PiiGuard,
 ) {
     fun chatCompletion(
         authorizationHeader: String?,
@@ -33,16 +37,20 @@ class UnifiedAiService(
         val projectId = requireNotNull(credential.project.id) { "API key project id must exist" }
 
         val tools = projectContextToolService.getProjectTools(projectId)
-        val enrichedRequest = request.withDefaultSystemPrompt()
         val startedAt = System.nanoTime()
         val response = try {
             validateAllowedModel(
                 projectId = projectId,
-                request = enrichedRequest,
+                request = request,
             )
-            val providerAdapter = providerRouter.route(enrichedRequest.model)
+            // 민감정보 검사는 provider 호출 직전에 수행한다.
+            // 차단되면 그대로 예외가 되어 아래 catch에서 실패 사용량으로 기록된다.
+            val guardedRequest = request
+                .withInspectedMessages(credential.project)
+                .withDefaultSystemPrompt()
+            val providerAdapter = providerRouter.route(guardedRequest.model)
             providerAdapter.chatCompletion(
-                request = enrichedRequest,
+                request = guardedRequest,
                 tools = tools,
                 toolExecutionContext = AiToolExecutionContext(
                     userId = requireNotNull(credential.createdByUser.id) { "API key creator id must exist" },
@@ -53,7 +61,7 @@ class UnifiedAiService(
         } catch (exception: KairosException) {
             aiUsageLoggingService.recordFailure(
                 apiKey = credential,
-                model = enrichedRequest.model,
+                model = request.model,
                 latencyMs = elapsedMillis(startedAt),
                 errorCode = exception.errorCode.code,
             )
@@ -61,7 +69,7 @@ class UnifiedAiService(
         } catch (exception: Exception) {
             aiUsageLoggingService.recordFailure(
                 apiKey = credential,
-                model = enrichedRequest.model,
+                model = request.model,
                 latencyMs = elapsedMillis(startedAt),
                 errorCode = KairosErrorCode.INTERNAL_SERVER_ERROR.code,
             )
@@ -71,7 +79,7 @@ class UnifiedAiService(
 
         aiUsageLoggingService.recordSuccess(
             apiKey = credential,
-            model = enrichedRequest.model,
+            model = request.model,
             response = response,
             latencyMs = latencyMs,
         )
@@ -91,6 +99,21 @@ class UnifiedAiService(
         if (!projectAllowedModelRepository.existsByProject_IdAndModelAndDeletedAtIsNull(projectId, request.model)) {
             throw KairosException(KairosErrorCode.AI_MODEL_NOT_ALLOWED)
         }
+    }
+
+    // KAIROS가 붙이는 시스템 프롬프트에는 민감정보가 없으므로 사용자 메시지만 검사한다.
+    // 메시지를 하나씩 검사하면 같은 요청이 감사 로그에 여러 건으로 흩어지므로 한 번에 넘긴다.
+    private fun ChatCompletionRequest.withInspectedMessages(project: Project): ChatCompletionRequest {
+        val inspectedContents = piiGuard.inspectAll(
+            project = project,
+            source = PiiInspectionSource.CHAT_PROMPT,
+            texts = messages.map { it.content },
+        )
+        return copy(
+            messages = messages.mapIndexed { index, message ->
+                message.copy(content = inspectedContents[index])
+            },
+        )
     }
 
     private fun ChatCompletionRequest.withDefaultSystemPrompt(): ChatCompletionRequest =

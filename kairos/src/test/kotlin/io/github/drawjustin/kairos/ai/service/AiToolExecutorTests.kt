@@ -1,6 +1,10 @@
 package io.github.drawjustin.kairos.ai.service
 
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
+import io.github.drawjustin.kairos.common.error.KairosErrorCode
+import io.github.drawjustin.kairos.common.error.KairosException
+import io.github.drawjustin.kairos.pii.defaultPolicyPiiGuard
+import io.github.drawjustin.kairos.pii.passThroughPiiGuard
 import io.github.drawjustin.kairos.ai.tool.AiToolDefinition
 import io.github.drawjustin.kairos.context.service.ContextSearchLoggingService
 import io.github.drawjustin.kairos.context.type.ContextSearchPurpose
@@ -9,6 +13,7 @@ import io.github.drawjustin.kairos.project.entity.Project
 import io.github.drawjustin.kairos.tenant.entity.Tenant
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.assertThrows
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.mockingDetails
 import org.springframework.http.HttpMethod
@@ -31,6 +36,7 @@ class AiToolExecutorTests {
         val executor = AiToolExecutor(
             objectMapper = objectMapper,
             contextSearchLoggingService = contextSearchLoggingService,
+            piiGuard = passThroughPiiGuard(),
             restClientBuilder = restClientBuilder,
         )
         val project = Project(
@@ -85,4 +91,96 @@ class AiToolExecutorTests {
         assertThat(invocation.arguments[7] as Long).isGreaterThanOrEqualTo(0)
         server.verify()
     }
+
+    @Test
+    fun `masks sensitive values inside a tool result before handing it back to the provider`() {
+        val restClientBuilder = RestClient.builder()
+        val server = MockRestServiceServer.bindTo(restClientBuilder).build()
+        val executor = AiToolExecutor(
+            objectMapper = objectMapper,
+            contextSearchLoggingService = mock(ContextSearchLoggingService::class.java),
+            piiGuard = defaultPolicyPiiGuard(),
+            restClientBuilder = restClientBuilder,
+        )
+        val tool = crmTool()
+
+        server.expect(requestTo("https://mcp.internal/crm/search"))
+            .andRespond(
+                withSuccess(
+                    """
+                    {"documents": [{"title": "고객 카드", "content": "담당자 010-1234-5678 / hong@example.com"}]}
+                    """.trimIndent(),
+                    MediaType.APPLICATION_JSON,
+                ),
+            )
+
+        val result = executor.executeQuery(tool = tool, query = "고객 연락처", project = project())
+
+        assertThat(result).contains("010-****-5678")
+        assertThat(result).contains("h***@example.com")
+        assertThat(result).doesNotContain("010-1234-5678")
+        assertThat(result).doesNotContain("hong@example.com")
+        server.verify()
+    }
+
+    @Test
+    fun `blocks a tool result that carries a resident registration number`() {
+        val restClientBuilder = RestClient.builder()
+        val server = MockRestServiceServer.bindTo(restClientBuilder).build()
+        val executor = AiToolExecutor(
+            objectMapper = objectMapper,
+            contextSearchLoggingService = mock(ContextSearchLoggingService::class.java),
+            piiGuard = defaultPolicyPiiGuard(),
+            restClientBuilder = restClientBuilder,
+        )
+        val tool = crmTool()
+
+        server.expect(requestTo("https://mcp.internal/crm/search"))
+            .andRespond(
+                withSuccess(
+                    """{"documents": [{"title": "가입 원본", "content": "주민번호 900101-1234567"}]}""",
+                    MediaType.APPLICATION_JSON,
+                ),
+            )
+
+        val exception = assertThrows<KairosException> {
+            executor.executeQuery(tool = tool, query = "가입 정보", project = project())
+        }
+
+        assertThat(exception.errorCode).isEqualTo(KairosErrorCode.AI_SENSITIVE_DATA_BLOCKED)
+        server.verify()
+    }
+
+    @Test
+    fun `leaves the tool result untouched when no project is given`() {
+        val restClientBuilder = RestClient.builder()
+        val server = MockRestServiceServer.bindTo(restClientBuilder).build()
+        val executor = AiToolExecutor(
+            objectMapper = objectMapper,
+            contextSearchLoggingService = mock(ContextSearchLoggingService::class.java),
+            piiGuard = defaultPolicyPiiGuard(),
+            restClientBuilder = restClientBuilder,
+        )
+        val tool = crmTool()
+
+        server.expect(requestTo("https://mcp.internal/crm/search"))
+            .andRespond(
+                withSuccess("""{"documents": [{"content": "담당자 010-1234-5678"}]}""", MediaType.APPLICATION_JSON),
+            )
+
+        val result = executor.executeQuery(tool = tool, query = "고객 연락처")
+
+        assertThat(result).contains("010-1234-5678")
+        server.verify()
+    }
+
+    private fun project() = Project(id = 10, tenant = Tenant(id = 1, name = "platform"), name = "kairos")
+
+    private fun crmTool() = AiToolDefinition(
+        sourceId = 4,
+        name = "crm_search",
+        description = "고객 정보를 검색한다.",
+        sourceType = ContextSourceType.MCP_SERVER,
+        sourceUri = "https://mcp.internal/crm/search",
+    )
 }

@@ -6,6 +6,9 @@ import io.github.drawjustin.kairos.ai.tool.AiToolDefinition
 import io.github.drawjustin.kairos.common.error.KairosErrorCode
 import io.github.drawjustin.kairos.common.error.KairosException
 import io.github.drawjustin.kairos.context.service.ContextSearchLoggingService
+import io.github.drawjustin.kairos.pii.service.PiiGuard
+import io.github.drawjustin.kairos.pii.type.PiiInspectionSource
+import io.github.drawjustin.kairos.project.entity.Project
 import org.springframework.http.MediaType
 import org.springframework.stereotype.Service
 import org.springframework.web.client.RestClient
@@ -16,6 +19,7 @@ import org.springframework.web.client.body
 class AiToolExecutor(
     private val objectMapper: ObjectMapper,
     private val contextSearchLoggingService: ContextSearchLoggingService,
+    private val piiGuard: PiiGuard,
     restClientBuilder: RestClient.Builder,
 ) {
     private val restClient = restClientBuilder.build()
@@ -40,10 +44,13 @@ class AiToolExecutor(
         return executeQuery(tool = tool, query = query, context = context)
     }
 
+    // project를 넘기면 tool 실행 결과에도 민감정보 정책을 적용한다.
+    // 사내 문서에 담긴 고객정보가 provider로 되돌아가는 경로라 프롬프트만 막아서는 통제가 성립하지 않는다.
     fun executeQuery(
         tool: AiToolDefinition,
         query: String,
         context: AiToolExecutionContext? = null,
+        project: Project? = context?.project,
     ): String {
         val startedAt = System.nanoTime()
         val searchQuery = query.trim()
@@ -66,14 +73,18 @@ class AiToolExecutor(
                 .retrieve()
                 .body<String>()
                 ?: throw KairosException(KairosErrorCode.AI_TOOL_EXECUTION_FAILED)
+            // 마스킹은 값이 있던 자리를 같은 길이의 문자로 덮을 뿐이라 JSON 구조는 그대로 유지된다.
+            val guardedResponse = project
+                ?.let { piiGuard.inspect(it, PiiInspectionSource.TOOL_RESULT, response) }
+                ?: response
             recordSuccess(
                 tool = tool,
                 query = searchQuery,
-                response = response,
+                response = guardedResponse,
                 latencyMs = elapsedMillis(startedAt),
                 context = context,
             )
-            response
+            guardedResponse
         } catch (exception: KairosException) {
             recordFailure(
                 tool = tool,

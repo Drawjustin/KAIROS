@@ -23,6 +23,9 @@ import io.github.drawjustin.kairos.auth.dto.RegisterRequest
 import io.github.drawjustin.kairos.common.api.BaseOutput
 import io.github.drawjustin.kairos.common.error.KairosErrorCode
 import io.github.drawjustin.kairos.common.error.KairosException
+import io.github.drawjustin.kairos.pii.repository.PiiDetectionLogRepository
+import io.github.drawjustin.kairos.pii.type.PiiAction
+import io.github.drawjustin.kairos.pii.type.PiiType
 import io.github.drawjustin.kairos.platform.dto.ApiKeyIssueResponse
 import io.github.drawjustin.kairos.platform.dto.CreateApiKeyRequest
 import io.github.drawjustin.kairos.platform.dto.CreateProjectRequest
@@ -43,6 +46,8 @@ import org.mockito.ArgumentMatchers.any
 import org.mockito.ArgumentMatchers.eq
 import org.mockito.BDDMockito.given
 import org.mockito.Mockito.mock
+import org.mockito.Mockito.never
+import org.mockito.Mockito.verify
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc
 import org.springframework.boot.test.context.SpringBootTest
@@ -87,6 +92,9 @@ class UnifiedAiIntegrationTests : IntegrationTestSupport() {
     @Autowired
     lateinit var aiUsageLogRepository: AiUsageLogRepository
 
+    @Autowired
+    lateinit var piiDetectionLogRepository: PiiDetectionLogRepository
+
     @MockitoBean
     lateinit var providerRouter: ProviderRouter
 
@@ -96,7 +104,7 @@ class UnifiedAiIntegrationTests : IntegrationTestSupport() {
     fun setUp() {
         // soft delete된 row까지 포함해 초기 상태를 맞춰 API key 인증 테스트가 흔들리지 않게 한다.
         jdbcTemplate.execute(
-            "truncate table context_search_log, ai_usage_log, api_key, project_context_source, context_source, project_allowed_model, project, tenant_user, tenant, refresh_session, users restart identity cascade",
+            "truncate table pii_detection_log, project_pii_policy, context_search_log, ai_usage_log, api_key, project_context_source, context_source, project_allowed_model, project, tenant_user, tenant, refresh_session, users restart identity cascade",
         )
         providerAdapter = mock(ProviderAdapter::class.java)
     }
@@ -317,6 +325,118 @@ class UnifiedAiIntegrationTests : IntegrationTestSupport() {
         adminUser.role = UserRole.ADMIN
         userRepository.save(adminUser)
         return login(LoginRequest(email = email, password = "password123"))
+    }
+
+    @Test
+    fun `chat completions blocks a prompt that carries a resident registration number`() {
+        val adminLogin = registerAdminAndLogin("pii-block@example.com")
+        val tenant = createTenant(adminLogin.accessToken, CreateTenantRequest(name = "pii-block-team"))
+        val project = createProject(adminLogin.accessToken, tenant.id, CreateProjectRequest(name = "pii-block-project"))
+        val issuedKey = createApiKey(adminLogin.accessToken, project.id, CreateApiKeyRequest(name = "default"))
+        val request = ChatCompletionRequest(
+            model = AiModel.GPT_4O_MINI,
+            messages = listOf(
+                ChatMessageRequest(
+                    role = ChatRole.USER,
+                    content = "고객 주민번호 900101-1234567 조회해줘",
+                ),
+            ),
+        )
+
+        val result = mockMvc.perform(
+            post("/api/v1/chat/completions")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer ${issuedKey.apiKey}")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsBytes(request)),
+        )
+            .andExpect(status().isForbidden)
+            .andReturn()
+
+        val response = objectMapper.readValue(result.response.contentAsByteArray, BaseOutput::class.java)
+        assertThat(response.errorCode).isEqualTo("AI_011")
+        // 차단 응답이 오히려 값을 흘리면 통제의 의미가 없다.
+        assertThat(result.response.contentAsString).doesNotContain("900101")
+        assertThat(result.response.contentAsString).doesNotContain("1234567")
+
+        // provider까지 가지 않는다.
+        verify(providerRouter, never()).route(AiModel.GPT_4O_MINI)
+
+        val usageLog = aiUsageLogRepository.findAll().single()
+        assertThat(usageLog.status).isEqualTo(AiUsageStatus.FAILED)
+        assertThat(usageLog.errorCode).isEqualTo("AI_011")
+
+        val detection = piiDetectionLogRepository.findAllByProject_IdOrderByIdAsc(project.id).single()
+        assertThat(detection.piiType).isEqualTo(PiiType.RESIDENT_REGISTRATION_NUMBER)
+        assertThat(detection.action).isEqualTo(PiiAction.BLOCK)
+        assertThat(detection.traceId).isNotBlank()
+    }
+
+    @Test
+    fun `chat completions masks a phone number before the prompt reaches the provider`() {
+        val adminLogin = registerAdminAndLogin("pii-mask@example.com")
+        val tenant = createTenant(adminLogin.accessToken, CreateTenantRequest(name = "pii-mask-team"))
+        val project = createProject(adminLogin.accessToken, tenant.id, CreateProjectRequest(name = "pii-mask-project"))
+        val issuedKey = createApiKey(adminLogin.accessToken, project.id, CreateApiKeyRequest(name = "default"))
+        val request = ChatCompletionRequest(
+            model = AiModel.GPT_4O_MINI,
+            messages = listOf(
+                ChatMessageRequest(
+                    role = ChatRole.USER,
+                    content = "담당자 연락처 010-1234-5678 로 안내문 초안 써줘",
+                ),
+            ),
+        )
+
+        // provider가 실제로 받는 요청. 스텁이 이 값과 일치하지 않으면 테스트가 실패한다.
+        val expectedRequest = request.copy(
+            messages = listOf(
+                ChatMessageRequest(
+                    role = ChatRole.SYSTEM,
+                    content = "너는 KAIROS의 사내 AI 어시스턴트다. 내부 문서를 우선 참고하고, 근거 없는 내용은 추측하지 마라.",
+                ),
+                ChatMessageRequest(
+                    role = ChatRole.USER,
+                    content = "담당자 연락처 010-****-5678 로 안내문 초안 써줘",
+                ),
+            ),
+        )
+
+        given(providerRouter.route(AiModel.GPT_4O_MINI)).willReturn(providerAdapter)
+        given(
+            providerAdapter.chatCompletion(
+                eqNotNull(expectedRequest),
+                eqNotNull(emptyList<AiToolDefinition>()),
+                any(AiToolExecutionContext::class.java),
+            ),
+        )
+            .willReturn(
+                ChatCompletionResponse(
+                    id = "chatcmpl_masked",
+                    `object` = "chat.completion",
+                    created = 1_713_086_400,
+                    model = "gpt-4o-mini",
+                    choices = listOf(
+                        ChatChoiceResponse(
+                            index = 0,
+                            message = ChatMessageResponse(role = ChatRole.ASSISTANT, content = "초안입니다"),
+                            finishReason = "stop",
+                        ),
+                    ),
+                    usage = ChatUsageResponse(promptTokens = 10, completionTokens = 5, totalTokens = 15),
+                ),
+            )
+
+        mockMvc.perform(
+            post("/api/v1/chat/completions")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer ${issuedKey.apiKey}")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsBytes(request)),
+        )
+            .andExpect(status().isOk)
+
+        val detection = piiDetectionLogRepository.findAllByProject_IdOrderByIdAsc(project.id).single()
+        assertThat(detection.piiType).isEqualTo(PiiType.PHONE_NUMBER)
+        assertThat(detection.action).isEqualTo(PiiAction.MASK)
     }
 
     private fun <T> eqNotNull(value: T): T = eq(value) ?: value

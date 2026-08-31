@@ -11,6 +11,8 @@ import io.github.drawjustin.kairos.common.error.KairosException
 import io.github.drawjustin.kairos.context.dto.ContextSearchRequest
 import io.github.drawjustin.kairos.context.dto.ContextSearchResult
 import io.github.drawjustin.kairos.context.dto.ContextSourceCatalogItem
+import io.github.drawjustin.kairos.pii.service.PiiGuard
+import io.github.drawjustin.kairos.pii.type.PiiInspectionSource
 import io.github.drawjustin.kairos.platform.dto.ProjectOutput
 import io.github.drawjustin.kairos.project.entity.Project
 import io.github.drawjustin.kairos.project.repository.ProjectRepository
@@ -28,6 +30,7 @@ class ContextSearchService(
     private val projectContextToolService: ProjectContextToolService,
     private val aiToolExecutor: AiToolExecutor,
     private val contextSearchLoggingService: ContextSearchLoggingService,
+    private val piiGuard: PiiGuard,
     private val objectMapper: ObjectMapper,
 ) {
     @Transactional(readOnly = true)
@@ -53,14 +56,22 @@ class ContextSearchService(
         var searchedContextSourceIds = emptyList<Long>()
         val project = resolveAccessibleProject(principal, request.projectId)
         val projectId = requireNotNull(project.id) { "Project id must exist" }
+
+        // 질의 검사는 try 밖에서 먼저 수행한다.
+        // 차단된 질의가 catch로 흘러가면 원문이 context_search_log에 그대로 적재되기 때문이다.
+        // 차단 사실은 pii_detection_log에 이미 남으므로 감사에는 공백이 생기지 않는다.
+        val guardedRequest = request.copy(
+            query = piiGuard.inspect(project, PiiInspectionSource.CONTEXT_QUERY, request.query.trim()),
+        )
+
         return try {
-            val query = request.query.trim()
+            val query = guardedRequest.query
             val tools = projectContextToolService.getProjectTools(projectId)
             val searchTools = tools.filterByRequestedSources(request.contextSourceIds)
             searchedContextSourceIds = searchTools.map { it.sourceId }
             val results = searchTools
                 .flatMap { tool ->
-                    val rawResponse = aiToolExecutor.executeQuery(tool, query)
+                    val rawResponse = aiToolExecutor.executeQuery(tool, query, project = project)
                     rawResponse.toSearchResults(tool)
                 }
                 .sortedWith(
@@ -72,7 +83,7 @@ class ContextSearchService(
             contextSearchLoggingService.recordSuccess(
                 principal = principal,
                 project = project,
-                request = request,
+                request = guardedRequest,
                 searchedContextSourceIds = searchedContextSourceIds,
                 resultCount = results.size,
                 latencyMs = elapsedMillis(startedAt),
@@ -82,7 +93,7 @@ class ContextSearchService(
             contextSearchLoggingService.recordFailure(
                 principal = principal,
                 project = project,
-                request = request,
+                request = guardedRequest,
                 searchedContextSourceIds = searchedContextSourceIds,
                 latencyMs = elapsedMillis(startedAt),
                 errorCode = exception.errorCode.code,
@@ -92,7 +103,7 @@ class ContextSearchService(
             contextSearchLoggingService.recordFailure(
                 principal = principal,
                 project = project,
-                request = request,
+                request = guardedRequest,
                 searchedContextSourceIds = searchedContextSourceIds,
                 latencyMs = elapsedMillis(startedAt),
                 errorCode = KairosErrorCode.INTERNAL_SERVER_ERROR.code,

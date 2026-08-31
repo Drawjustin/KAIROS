@@ -1,6 +1,7 @@
 package io.github.drawjustin.kairos.ai.provider
 
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
+import io.github.drawjustin.kairos.pii.passThroughPiiGuard
 import io.github.drawjustin.kairos.ai.config.GeminiProperties
 import io.github.drawjustin.kairos.ai.dto.ChatCompletionRequest
 import io.github.drawjustin.kairos.ai.dto.ChatMessageRequest
@@ -38,6 +39,7 @@ class GeminiProviderAdapterTests {
             aiToolExecutor = AiToolExecutor(
                 objectMapper = objectMapper,
                 contextSearchLoggingService = mock(ContextSearchLoggingService::class.java),
+                piiGuard = passThroughPiiGuard(),
                 restClientBuilder = restClientBuilder,
             ),
             objectMapper = objectMapper,
