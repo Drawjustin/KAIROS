@@ -46,6 +46,7 @@ enum class KairosErrorCode(
     AI_SENSITIVE_DATA_BLOCKED(HttpStatus.FORBIDDEN, "AI_011", "Request contains sensitive data blocked by project policy"),
     AI_BUDGET_EXCEEDED(HttpStatus.TOO_MANY_REQUESTS, "AI_012", "Project budget limit exceeded"),
     AI_PROVIDER_OVERLOADED(HttpStatus.SERVICE_UNAVAILABLE, "AI_013", "AI provider is temporarily overloaded"),
+    AI_PROVIDER_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "AI_014", "AI provider is temporarily unavailable"),
     INVALID_INPUT(HttpStatus.BAD_REQUEST, "COMMON_001", "Invalid input"),
     INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "COMMON_999", "Internal server error", slackError = true),
 }

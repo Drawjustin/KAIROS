@@ -26,6 +26,8 @@ import io.github.drawjustin.kairos.common.error.KairosException
 import org.springframework.http.HttpHeaders
 import org.springframework.http.MediaType
 import io.github.resilience4j.bulkhead.annotation.Bulkhead
+import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker
+import io.github.resilience4j.retry.annotation.Retry
 import org.springframework.stereotype.Component
 import org.springframework.web.client.RestClient
 import org.springframework.web.client.body
@@ -44,6 +46,8 @@ class OpenAiProviderAdapter(
     // provider별로 동시 호출 수를 따로 제한한다.
     // OpenAI이 느려졌을 때 그 지연이 톰캣 스레드 풀 전체를 잠식하면
     // 아무 관계없는 다른 provider 요청까지 함께 멈춘다. 피해를 provider 안에 가두는 것이 목적이다.
+    @Retry(name = "openai")
+    @CircuitBreaker(name = "openai")
     @Bulkhead(name = "openai")
     override fun chatCompletion(
         request: ChatCompletionRequest,
@@ -73,10 +77,9 @@ class OpenAiProviderAdapter(
                     request = request.toProviderRequest(messages = followUpMessages, tools = tools),
                 ).toChatCompletionResponse()
             }
-        } catch (exception: KairosException) {
-            throw exception
         } catch (exception: Exception) {
-            throw KairosException(KairosErrorCode.AI_PROVIDER_ERROR, exception.message ?: KairosErrorCode.AI_PROVIDER_ERROR.message)
+            // 재시도할 가치가 있는 실패인지 여기서 갈린다. 판정 기준은 ProviderFailures에 모여 있다.
+            throw exception.toProviderFailure()
         }
     }
 

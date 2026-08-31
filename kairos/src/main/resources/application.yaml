@@ -48,3 +48,44 @@ resilience4j:
         base-config: default
       gemini:
         base-config: default
+
+  circuitbreaker:
+    configs:
+      default:
+        # 재시도할 가치가 있는 실패만 집계한다. 잘못된 API key 같은 4xx로 서킷이 열리면
+        # provider는 멀쩡한데 우리가 스스로 길을 막는 셈이 된다.
+        record-failure-predicate: io.github.drawjustin.kairos.ai.provider.RetryableProviderFailure
+        sliding-window-type: COUNT_BASED
+        sliding-window-size: 20
+        minimum-number-of-calls: 10
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 30s
+        permitted-number-of-calls-in-half-open-state: 3
+        automatic-transition-from-open-to-half-open-enabled: true
+    instances:
+      openai:
+        base-config: default
+      anthropic:
+        base-config: default
+      gemini:
+        base-config: default
+
+  retry:
+    configs:
+      default:
+        # 5xx와 타임아웃만 다시 건다. 4xx는 몇 번을 걸어도 같은 답이 오므로 부하만 늘린다.
+        retry-exception-predicate: io.github.drawjustin.kairos.ai.provider.RetryableProviderFailure
+        max-attempts: 3
+        wait-duration: 200ms
+        # 장애 상황에서 모든 요청이 같은 간격으로 몰리면 회복을 오히려 늦춘다.
+        enable-exponential-backoff: true
+        exponential-backoff-multiplier: 2
+        enable-randomized-wait: true
+        randomized-wait-factor: 0.3
+    instances:
+      openai:
+        base-config: default
+      anthropic:
+        base-config: default
+      gemini:
+        base-config: default

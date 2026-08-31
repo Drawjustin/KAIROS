@@ -15,6 +15,7 @@ import io.github.drawjustin.kairos.pii.type.PiiInspectionSource
 import io.github.drawjustin.kairos.project.entity.Project
 import io.github.drawjustin.kairos.project.repository.ProjectAllowedModelRepository
 import io.github.resilience4j.bulkhead.BulkheadFullException
+import io.github.resilience4j.circuitbreaker.CallNotPermittedException
 import org.springframework.stereotype.Service
 
 @Service
@@ -76,6 +77,17 @@ class UnifiedAiService(
                 errorCode = exception.errorCode.code,
             )
             throw exception
+        } catch (exception: CallNotPermittedException) {
+            // 서킷이 열려 있어 호출조차 하지 않은 상태다.
+            // 죽은 provider를 계속 두드리며 지연을 쌓는 대신 즉시 실패를 돌려준다.
+            budgetGuard.release(reservation)
+            aiUsageLoggingService.recordFailure(
+                apiKey = credential,
+                model = request.model,
+                latencyMs = elapsedMillis(startedAt),
+                errorCode = KairosErrorCode.AI_PROVIDER_UNAVAILABLE.code,
+            )
+            throw KairosException(KairosErrorCode.AI_PROVIDER_UNAVAILABLE)
         } catch (exception: BulkheadFullException) {
             // 동시 호출 제한에 걸린 것은 장애가 아니라 격리가 동작한 결과다.
             // 서버 오류로 묶어버리면 운영에서 진짜 장애와 구분할 수 없다.
