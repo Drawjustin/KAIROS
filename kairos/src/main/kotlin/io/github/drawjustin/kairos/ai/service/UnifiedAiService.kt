@@ -5,6 +5,8 @@ import io.github.drawjustin.kairos.ai.dto.ChatCompletionResponse
 import io.github.drawjustin.kairos.ai.dto.ChatMessageRequest
 import io.github.drawjustin.kairos.ai.provider.ProviderRouter
 import io.github.drawjustin.kairos.ai.type.ChatRole
+import io.github.drawjustin.kairos.budget.service.BudgetGuard
+import io.github.drawjustin.kairos.budget.service.BudgetReservation
 import io.github.drawjustin.kairos.common.error.KairosErrorCode
 import io.github.drawjustin.kairos.common.error.KairosException
 import io.github.drawjustin.kairos.context.type.ContextSearchPurpose
@@ -23,6 +25,7 @@ class UnifiedAiService(
     private val projectAllowedModelRepository: ProjectAllowedModelRepository,
     private val projectContextToolService: ProjectContextToolService,
     private val piiGuard: PiiGuard,
+    private val budgetGuard: BudgetGuard,
 ) {
     fun chatCompletion(
         authorizationHeader: String?,
@@ -38,6 +41,8 @@ class UnifiedAiService(
 
         val tools = projectContextToolService.getProjectTools(projectId)
         val startedAt = System.nanoTime()
+        // 선점에 실패하면 되돌릴 것이 없으므로 빈 예약으로 시작한다.
+        var reservation = BudgetReservation.none(projectId)
         val response = try {
             validateAllowedModel(
                 projectId = projectId,
@@ -48,6 +53,9 @@ class UnifiedAiService(
             val guardedRequest = request
                 .withInspectedMessages(credential.project)
                 .withDefaultSystemPrompt()
+            // 예산 선점은 민감정보 검사를 통과한 뒤에 한다.
+            // 차단될 요청이 먼저 한도를 갉아먹으면 정작 정상 요청이 밀려난다.
+            reservation = budgetGuard.reserve(projectId)
             val providerAdapter = providerRouter.route(guardedRequest.model)
             providerAdapter.chatCompletion(
                 request = guardedRequest,
@@ -59,6 +67,7 @@ class UnifiedAiService(
                 ),
             )
         } catch (exception: KairosException) {
+            budgetGuard.release(reservation)
             aiUsageLoggingService.recordFailure(
                 apiKey = credential,
                 model = request.model,
@@ -67,6 +76,7 @@ class UnifiedAiService(
             )
             throw exception
         } catch (exception: Exception) {
+            budgetGuard.release(reservation)
             aiUsageLoggingService.recordFailure(
                 apiKey = credential,
                 model = request.model,
@@ -77,6 +87,8 @@ class UnifiedAiService(
         }
         val latencyMs = elapsedMillis(startedAt)
 
+        // 호출 전에는 토큰 수를 알 수 없으므로 응답이 온 지금 실제 사용량으로 정산한다.
+        budgetGuard.settle(reservation, response.usage?.totalTokens ?: 0)
         aiUsageLoggingService.recordSuccess(
             apiKey = credential,
             model = request.model,

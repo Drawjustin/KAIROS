@@ -20,6 +20,9 @@ import io.github.drawjustin.kairos.auth.dto.AuthOutput
 import io.github.drawjustin.kairos.auth.dto.AuthResponse
 import io.github.drawjustin.kairos.auth.dto.LoginRequest
 import io.github.drawjustin.kairos.auth.dto.RegisterRequest
+import io.github.drawjustin.kairos.budget.entity.ProjectBudget
+import io.github.drawjustin.kairos.budget.repository.ProjectBudgetRepository
+import io.github.drawjustin.kairos.budget.type.BudgetPeriod
 import io.github.drawjustin.kairos.common.api.BaseOutput
 import io.github.drawjustin.kairos.common.error.KairosErrorCode
 import io.github.drawjustin.kairos.common.error.KairosException
@@ -39,6 +42,7 @@ import io.github.drawjustin.kairos.tenant.repository.TenantRepository
 import io.github.drawjustin.kairos.tenant.repository.TenantUserRepository
 import io.github.drawjustin.kairos.user.repository.UserRepository
 import io.github.drawjustin.kairos.user.type.UserRole
+import java.time.Instant
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -95,6 +99,9 @@ class UnifiedAiIntegrationTests : IntegrationTestSupport() {
     @Autowired
     lateinit var piiDetectionLogRepository: PiiDetectionLogRepository
 
+    @Autowired
+    lateinit var projectBudgetRepository: ProjectBudgetRepository
+
     @MockitoBean
     lateinit var providerRouter: ProviderRouter
 
@@ -104,7 +111,7 @@ class UnifiedAiIntegrationTests : IntegrationTestSupport() {
     fun setUp() {
         // soft delete된 row까지 포함해 초기 상태를 맞춰 API key 인증 테스트가 흔들리지 않게 한다.
         jdbcTemplate.execute(
-            "truncate table pii_detection_log, project_pii_policy, context_search_log, ai_usage_log, api_key, project_context_source, context_source, project_allowed_model, project, tenant_user, tenant, refresh_session, users restart identity cascade",
+            "truncate table pii_detection_log, project_pii_policy, project_budget, context_search_log, ai_usage_log, api_key, project_context_source, context_source, project_allowed_model, project, tenant_user, tenant, refresh_session, users restart identity cascade",
         )
         providerAdapter = mock(ProviderAdapter::class.java)
     }
@@ -438,6 +445,155 @@ class UnifiedAiIntegrationTests : IntegrationTestSupport() {
         assertThat(detection.piiType).isEqualTo(PiiType.PHONE_NUMBER)
         assertThat(detection.action).isEqualTo(PiiAction.MASK)
     }
+
+    @Test
+    fun `chat completions refuses the call once the request limit is used up`() {
+        val adminLogin = registerAdminAndLogin("budget-limit@example.com")
+        val tenant = createTenant(adminLogin.accessToken, CreateTenantRequest(name = "budget-limit-team"))
+        val project = createProject(adminLogin.accessToken, tenant.id, CreateProjectRequest(name = "budget-limit-project"))
+        val issuedKey = createApiKey(adminLogin.accessToken, project.id, CreateApiKeyRequest(name = "default"))
+        givenBudget(project.id, requestLimit = 1)
+        givenProviderReturns("첫 번째 질문", totalTokens = 22)
+
+        performChat(issuedKey.apiKey, "첫 번째 질문").andExpect(status().isOk)
+
+        val result = performChat(issuedKey.apiKey, "첫 번째 질문")
+            .andExpect(status().isTooManyRequests)
+            .andReturn()
+        assertThat(objectMapper.readValue(result.response.contentAsByteArray, BaseOutput::class.java).errorCode)
+            .isEqualTo("AI_012")
+
+        val budget = reloadBudget(project.id)
+        assertThat(budget.consumedRequests).isEqualTo(1)
+        assertThat(aiUsageLogRepository.findAll().count { it.status == AiUsageStatus.FAILED }).isEqualTo(1)
+    }
+
+    @Test
+    fun `chat completions settles the tokens the response actually used`() {
+        val adminLogin = registerAdminAndLogin("budget-settle@example.com")
+        val tenant = createTenant(adminLogin.accessToken, CreateTenantRequest(name = "budget-settle-team"))
+        val project = createProject(adminLogin.accessToken, tenant.id, CreateProjectRequest(name = "budget-settle-project"))
+        val issuedKey = createApiKey(adminLogin.accessToken, project.id, CreateApiKeyRequest(name = "default"))
+        givenBudget(project.id, requestLimit = 10, tokenLimit = 1_000)
+        givenProviderReturns("첫 번째 질문", totalTokens = 22)
+
+        performChat(issuedKey.apiKey, "첫 번째 질문").andExpect(status().isOk)
+
+        val budget = reloadBudget(project.id)
+        assertThat(budget.consumedRequests).isEqualTo(1)
+        assertThat(budget.consumedTokens).isEqualTo(22)
+    }
+
+    @Test
+    fun `chat completions gives the reservation back when the provider fails`() {
+        val adminLogin = registerAdminAndLogin("budget-release@example.com")
+        val tenant = createTenant(adminLogin.accessToken, CreateTenantRequest(name = "budget-release-team"))
+        val project = createProject(adminLogin.accessToken, tenant.id, CreateProjectRequest(name = "budget-release-project"))
+        val issuedKey = createApiKey(adminLogin.accessToken, project.id, CreateApiKeyRequest(name = "default"))
+        givenBudget(project.id, requestLimit = 1)
+
+        given(providerRouter.route(AiModel.GPT_4O_MINI)).willReturn(providerAdapter)
+        given(
+            providerAdapter.chatCompletion(
+                eqNotNull(enrichedRequestOf("첫 번째 질문")),
+                eqNotNull(emptyList<AiToolDefinition>()),
+                any(AiToolExecutionContext::class.java),
+            ),
+        )
+            .willThrow(KairosException(KairosErrorCode.AI_PROVIDER_ERROR))
+
+        performChat(issuedKey.apiKey, "첫 번째 질문").andExpect(status().isInternalServerError)
+
+        // 호출이 실패했으니 선점분은 되돌아가고 한도는 그대로 남아 있어야 한다.
+        assertThat(reloadBudget(project.id).consumedRequests).isEqualTo(0)
+    }
+
+    @Test
+    fun `a prompt blocked for sensitive data does not consume the budget`() {
+        val adminLogin = registerAdminAndLogin("budget-pii@example.com")
+        val tenant = createTenant(adminLogin.accessToken, CreateTenantRequest(name = "budget-pii-team"))
+        val project = createProject(adminLogin.accessToken, tenant.id, CreateProjectRequest(name = "budget-pii-project"))
+        val issuedKey = createApiKey(adminLogin.accessToken, project.id, CreateApiKeyRequest(name = "default"))
+        givenBudget(project.id, requestLimit = 1)
+
+        performChat(issuedKey.apiKey, "주민번호 900101-1234567 조회해줘").andExpect(status().isForbidden)
+
+        // 차단된 요청이 한도를 갉아먹으면 정상 요청이 밀려난다.
+        assertThat(reloadBudget(project.id).consumedRequests).isEqualTo(0)
+    }
+
+    private fun givenBudget(projectId: Long, requestLimit: Long? = null, tokenLimit: Long? = null) {
+        projectBudgetRepository.saveAndFlush(
+            ProjectBudget(
+                project = projectRepository.findByIdAndDeletedAtIsNull(projectId).orElseThrow(),
+                period = BudgetPeriod.DAILY,
+                requestLimit = requestLimit,
+                tokenLimit = tokenLimit,
+                periodStartedAt = Instant.now(),
+            ),
+        )
+    }
+
+    private fun reloadBudget(projectId: Long) =
+        projectBudgetRepository.findByProject_IdAndPeriodAndDeletedAtIsNull(projectId, BudgetPeriod.DAILY)!!
+
+    // 민감정보가 없는 프롬프트라 KAIROS가 붙이는 시스템 메시지만 앞에 추가된다.
+    private fun enrichedRequestOf(content: String) = ChatCompletionRequest(
+        model = AiModel.GPT_4O_MINI,
+        messages = listOf(
+            ChatMessageRequest(
+                role = ChatRole.SYSTEM,
+                content = "너는 KAIROS의 사내 AI 어시스턴트다. 내부 문서를 우선 참고하고, 근거 없는 내용은 추측하지 마라.",
+            ),
+            ChatMessageRequest(role = ChatRole.USER, content = content),
+        ),
+    )
+
+    private fun givenProviderReturns(content: String, totalTokens: Int) {
+        given(providerRouter.route(AiModel.GPT_4O_MINI)).willReturn(providerAdapter)
+        given(
+            providerAdapter.chatCompletion(
+                eqNotNull(enrichedRequestOf(content)),
+                eqNotNull(emptyList<AiToolDefinition>()),
+                any(AiToolExecutionContext::class.java),
+            ),
+        )
+            .willReturn(
+                ChatCompletionResponse(
+                    id = "chatcmpl_budget",
+                    `object` = "chat.completion",
+                    created = 1_713_086_400,
+                    model = "gpt-4o-mini",
+                    choices = listOf(
+                        ChatChoiceResponse(
+                            index = 0,
+                            message = ChatMessageResponse(role = ChatRole.ASSISTANT, content = "네"),
+                            finishReason = "stop",
+                        ),
+                    ),
+                    usage = ChatUsageResponse(
+                        promptTokens = totalTokens / 2,
+                        completionTokens = totalTokens - totalTokens / 2,
+                        totalTokens = totalTokens,
+                    ),
+                ),
+            )
+    }
+
+    private fun performChat(apiKey: String, content: String) =
+        mockMvc.perform(
+            post("/api/v1/chat/completions")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer $apiKey")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    objectMapper.writeValueAsBytes(
+                        ChatCompletionRequest(
+                            model = AiModel.GPT_4O_MINI,
+                            messages = listOf(ChatMessageRequest(role = ChatRole.USER, content = content)),
+                        ),
+                    ),
+                ),
+        )
 
     private fun <T> eqNotNull(value: T): T = eq(value) ?: value
 
