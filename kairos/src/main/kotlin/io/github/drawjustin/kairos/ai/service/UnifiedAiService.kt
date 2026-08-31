@@ -14,6 +14,7 @@ import io.github.drawjustin.kairos.pii.service.PiiGuard
 import io.github.drawjustin.kairos.pii.type.PiiInspectionSource
 import io.github.drawjustin.kairos.project.entity.Project
 import io.github.drawjustin.kairos.project.repository.ProjectAllowedModelRepository
+import io.github.resilience4j.bulkhead.BulkheadFullException
 import org.springframework.stereotype.Service
 
 @Service
@@ -75,6 +76,17 @@ class UnifiedAiService(
                 errorCode = exception.errorCode.code,
             )
             throw exception
+        } catch (exception: BulkheadFullException) {
+            // 동시 호출 제한에 걸린 것은 장애가 아니라 격리가 동작한 결과다.
+            // 서버 오류로 묶어버리면 운영에서 진짜 장애와 구분할 수 없다.
+            budgetGuard.release(reservation)
+            aiUsageLoggingService.recordFailure(
+                apiKey = credential,
+                model = request.model,
+                latencyMs = elapsedMillis(startedAt),
+                errorCode = KairosErrorCode.AI_PROVIDER_OVERLOADED.code,
+            )
+            throw KairosException(KairosErrorCode.AI_PROVIDER_OVERLOADED)
         } catch (exception: Exception) {
             budgetGuard.release(reservation)
             aiUsageLoggingService.recordFailure(

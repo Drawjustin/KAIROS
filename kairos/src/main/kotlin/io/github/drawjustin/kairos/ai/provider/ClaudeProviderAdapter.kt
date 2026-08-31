@@ -22,6 +22,7 @@ import io.github.drawjustin.kairos.common.error.KairosErrorCode
 import io.github.drawjustin.kairos.common.error.KairosException
 import java.time.Instant
 import org.springframework.http.MediaType
+import io.github.resilience4j.bulkhead.annotation.Bulkhead
 import org.springframework.stereotype.Component
 import org.springframework.web.client.RestClient
 import org.springframework.web.client.body
@@ -38,6 +39,10 @@ class ClaudeProviderAdapter(
 
     override fun supports(model: AiModel): Boolean = model.provider == AiProvider.CLAUDE
 
+    // provider별로 동시 호출 수를 따로 제한한다.
+    // Anthropic이 느려졌을 때 그 지연이 톰캣 스레드 풀 전체를 잠식하면
+    // 아무 관계없는 다른 provider 요청까지 함께 멈춘다. 피해를 provider 안에 가두는 것이 목적이다.
+    @Bulkhead(name = "anthropic")
     override fun chatCompletion(
         request: ChatCompletionRequest,
         tools: List<AiToolDefinition>,
