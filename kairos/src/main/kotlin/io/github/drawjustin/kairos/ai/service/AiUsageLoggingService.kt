@@ -22,6 +22,8 @@ class AiUsageLoggingService(
         model: AiModel,
         response: ChatCompletionResponse,
         latencyMs: Long,
+        // 대체 모델로 응답한 경우 원래 요청했던 모델이 담긴다.
+        fallbackFromModel: AiModel? = null,
     ) {
         val usage = response.usage
         aiUsageLogRepository.save(
@@ -37,6 +39,8 @@ class AiUsageLoggingService(
                 latencyMs = latencyMs,
                 providerResponseId = response.id,
                 traceId = currentTraceId(),
+                isFallback = fallbackFromModel != null,
+                fallbackFromModel = fallbackFromModel?.value,
             ),
         )
     }

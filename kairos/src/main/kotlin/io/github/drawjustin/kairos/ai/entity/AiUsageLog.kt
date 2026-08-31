@@ -68,6 +68,14 @@ class AiUsageLog(
 
     @Column(name = "trace_id", length = 64)
     var traceId: String? = null,
+
+    @Column(name = "is_fallback", nullable = false)
+    // 요청한 모델이 아니라 대체 모델로 응답했는지 여부다.
+    var isFallback: Boolean = false,
+
+    @Column(name = "fallback_from_model", length = 120)
+    // 원래 요청했던 모델. 대체가 일어나지 않았으면 null이다.
+    var fallbackFromModel: String? = null,
 ) {
     @CreatedDate
     @Column(name = "created_at", nullable = false, updatable = false)
