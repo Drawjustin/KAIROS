@@ -84,6 +84,7 @@ class ProviderFallbackTests : IntegrationTestSupport() {
 
     private lateinit var openAiAdapter: ProviderAdapter
     private lateinit var claudeAdapter: ProviderAdapter
+    private lateinit var geminiAdapter: ProviderAdapter
 
     @BeforeEach
     fun setUp() {
@@ -94,8 +95,10 @@ class ProviderFallbackTests : IntegrationTestSupport() {
         )
         openAiAdapter = mock(ProviderAdapter::class.java)
         claudeAdapter = mock(ProviderAdapter::class.java)
+        geminiAdapter = mock(ProviderAdapter::class.java)
         given(providerRouter.route(AiModel.GPT_4O_MINI)).willReturn(openAiAdapter)
         given(providerRouter.route(AiModel.CLAUDE_HAIKU_4_5)).willReturn(claudeAdapter)
+        given(providerRouter.route(AiModel.GEMINI_2_5_FLASH)).willReturn(geminiAdapter)
     }
 
     @Test
@@ -152,6 +155,59 @@ class ProviderFallbackTests : IntegrationTestSupport() {
 
         // 잘못된 요청을 다른 provider에 넘겨봐야 거기서도 똑같이 거절당한다.
         assertThat(aiUsageLogRepository.findAll().none { it.isFallback }).isTrue()
+    }
+
+    @Test
+    fun `keeps trying the remaining candidates when one of them refuses`() {
+        val setUpProject = givenProject("fallback-chain@example.com", "fallback-chain")
+        allowOnly(
+            setUpProject.projectId,
+            AiModel.GPT_4O_MINI,
+            AiModel.CLAUDE_HAIKU_4_5,
+            AiModel.GEMINI_2_5_FLASH,
+        )
+        givenOpenAiIsDown()
+        // 첫 번째 후보가 거절한다고 해서 남은 후보를 포기하면 안 된다.
+        given(
+            claudeAdapter.chatCompletion(
+                any(ChatCompletionRequest::class.java) ?: sampleRequest(),
+                anyToolList(),
+                any(AiToolExecutionContext::class.java),
+            ),
+        )
+            .willThrow(KairosException(KairosErrorCode.AI_PROVIDER_ERROR))
+        given(
+            geminiAdapter.chatCompletion(
+                any(ChatCompletionRequest::class.java) ?: sampleRequest(),
+                anyToolList(),
+                any(AiToolExecutionContext::class.java),
+            ),
+        )
+            .willReturn(
+                ChatCompletionResponse(
+                    id = "chatcmpl_gemini",
+                    `object` = "chat.completion",
+                    created = 1_713_086_400,
+                    model = AiModel.GEMINI_2_5_FLASH.value,
+                    choices = listOf(
+                        ChatChoiceResponse(
+                            index = 0,
+                            message = ChatMessageResponse(role = ChatRole.ASSISTANT, content = "제미나이 응답"),
+                            finishReason = "stop",
+                        ),
+                    ),
+                    usage = ChatUsageResponse(promptTokens = 3, completionTokens = 3, totalTokens = 6),
+                ),
+            )
+
+        val result = performChat(setUpProject.apiKey).andExpect(status().isOk).andReturn()
+
+        assertThat(
+            objectMapper.readValue(result.response.contentAsByteArray, ChatCompletionResponse::class.java).id,
+        ).isEqualTo("chatcmpl_gemini")
+        val usageLog = aiUsageLogRepository.findAll().single { it.status == AiUsageStatus.SUCCESS }
+        assertThat(usageLog.isFallback).isTrue()
+        assertThat(usageLog.fallbackFromModel).isEqualTo(AiModel.GPT_4O_MINI.value)
     }
 
     private fun anyToolList(): List<AiToolDefinition> =

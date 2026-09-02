@@ -10,6 +10,8 @@ import io.github.drawjustin.kairos.pii.detector.PiiScanner
 import io.github.drawjustin.kairos.pii.detector.ResidentRegistrationNumberRule
 import io.github.drawjustin.kairos.pii.type.PiiType
 import org.assertj.core.api.Assertions.assertThat
+import java.time.Duration
+import org.junit.jupiter.api.Assertions.assertTimeoutPreemptively
 import org.junit.jupiter.api.Test
 
 class PiiScannerTests {
@@ -101,6 +103,20 @@ class PiiScannerTests {
 
         assertThat(typesIn("1000 4539 1488 0343 6467"))
             .containsExactly(PiiType.CREDIT_CARD_NUMBER)
+    }
+
+    @Test
+    fun `scans a long uniform input without blowing up`() {
+        // 앞쪽 경계 검사가 빠진 규칙이 하나라도 있으면 정규식 엔진이 모든 위치에서 다시 시도하고,
+        // 비용이 입력 길이의 제곱으로 늘어 프롬프트 하나로 CPU를 오래 붙잡아 둘 수 있다.
+        // 메시지 하나가 가질 수 있는 최대 길이로 확인한다.
+        val longDigits = "9".repeat(20_000)
+        val longLetters = "abcdefghij".repeat(2_000)
+
+        assertTimeoutPreemptively(Duration.ofSeconds(2)) {
+            scanner.scan(longDigits)
+            scanner.scan(longLetters)
+        }
     }
 
     @Test

@@ -49,6 +49,12 @@ class PiiMaskerTests {
     }
 
     @Test
+    fun `hides a single character local part entirely`() {
+        // 첫 글자를 남기는 규칙을 그대로 적용하면 한 글자짜리 주소는 원문 그대로 통과한다.
+        assertThat(mask("a@example.com")).isEqualTo("*@example.com")
+    }
+
+    @Test
     fun `keeps only the last three digits of a bank account number`() {
         assertThat(mask("110-234-567890")).isEqualTo("***-***-***890")
     }

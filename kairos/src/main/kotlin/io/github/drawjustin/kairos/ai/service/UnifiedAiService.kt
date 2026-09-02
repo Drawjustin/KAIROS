@@ -155,9 +155,10 @@ class UnifiedAiService(
                     fallbackFromModel = request.model,
                 )
             } catch (exception: Exception) {
-                if (!exception.isProviderUnavailable()) {
-                    throw exception
-                }
+                // 후보 하나가 실패했다고 나머지를 포기하지 않는다.
+                // 여기서 예외를 그대로 올리면 아직 멀쩡한 provider가 남아 있는데도 요청이 끝나고,
+                // 사용자는 원래 장애 대신 마지막 후보가 낸 엉뚱한 오류를 받게 된다.
+                primaryFailure.addSuppressed(exception)
             }
         }
         // 대체할 곳이 없거나 후보가 모두 실패했다면 원래 장애를 그대로 돌려준다.
