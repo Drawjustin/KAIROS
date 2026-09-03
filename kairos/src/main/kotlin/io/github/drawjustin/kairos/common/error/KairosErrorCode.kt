@@ -48,5 +48,6 @@ enum class KairosErrorCode(
     AI_PROVIDER_OVERLOADED(HttpStatus.SERVICE_UNAVAILABLE, "AI_013", "AI provider is temporarily overloaded"),
     AI_PROVIDER_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "AI_014", "AI provider is temporarily unavailable"),
     INVALID_INPUT(HttpStatus.BAD_REQUEST, "COMMON_001", "Invalid input"),
+    RESOURCE_NOT_FOUND(HttpStatus.NOT_FOUND, "COMMON_002", "Resource not found"),
     INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "COMMON_999", "Internal server error", slackError = true),
 }

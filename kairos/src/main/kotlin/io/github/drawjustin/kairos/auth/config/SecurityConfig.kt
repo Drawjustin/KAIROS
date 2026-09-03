@@ -2,6 +2,7 @@ package io.github.drawjustin.kairos.auth.config
 
 import io.github.drawjustin.kairos.auth.security.JwtAuthenticationFilter
 import io.github.drawjustin.kairos.common.logging.TraceLoggingFilter
+import org.springframework.core.annotation.Order
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.security.config.annotation.web.builders.HttpSecurity
@@ -19,6 +20,22 @@ class SecurityConfig(
     private val traceLoggingFilter: TraceLoggingFilter,
 ) {
     @Bean
+    @Order(1)
+    // 관리 엔드포인트는 별도 포트에서만 열리므로 포트 자체가 경계 역할을 한다.
+    // 여기에 JWT 필터를 태우면 Prometheus가 지표를 긁어갈 때마다 토큰이 필요해져 운영이 불편해진다.
+    // 대신 이 포트를 서비스 포트와 함께 외부에 노출하지 않는 것이 전제다.
+    fun actuatorSecurityFilterChain(http: HttpSecurity): SecurityFilterChain =
+        http
+            .securityMatcher("/actuator/**")
+            .csrf { it.disable() }
+            .httpBasic { it.disable() }
+            .formLogin { it.disable() }
+            .sessionManagement { it.sessionCreationPolicy(SessionCreationPolicy.STATELESS) }
+            .authorizeHttpRequests { it.anyRequest().permitAll() }
+            .build()
+
+    @Bean
+    @Order(2)
     fun securityFilterChain(http: HttpSecurity): SecurityFilterChain {
         return http
             // 브라우저 세션 기반 앱이 아니라 JWT 기반 API라 기본 폼/세션 기능을 끈다.

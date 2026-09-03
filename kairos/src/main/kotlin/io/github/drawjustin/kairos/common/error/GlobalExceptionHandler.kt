@@ -11,6 +11,7 @@ import org.springframework.validation.FieldError
 import org.springframework.web.bind.MethodArgumentNotValidException
 import org.springframework.web.bind.annotation.ExceptionHandler
 import org.springframework.web.bind.annotation.RestControllerAdvice
+import org.springframework.web.servlet.resource.NoResourceFoundException
 
 @RestControllerAdvice
 // 컨트롤러 전역에서 예외를 공통 BaseOutput 형식으로 변환한다.
@@ -75,6 +76,24 @@ class GlobalExceptionHandler(
             BaseOutput(
                 errorCode = error.code,
                 errorMessage = exception.message ?: error.message,
+            ),
+        )
+    }
+
+    @ExceptionHandler(NoResourceFoundException::class)
+    // 존재하지 않는 경로 요청은 장애가 아니다.
+    // 마지막 Exception 핸들러에 맡기면 404가 500이 되고, 500은 슬랙 알림 대상이라
+    // 취약점 스캐너가 훑고 지나가는 것만으로 알림이 쏟아지고 에러 로그가 스택트레이스로 덮인다.
+    fun handleNoResourceFound(
+        exception: NoResourceFoundException,
+        request: HttpServletRequest,
+    ): ResponseEntity<BaseOutput> {
+        val error = KairosErrorCode.RESOURCE_NOT_FOUND
+        logException(error, exception, request)
+        return ResponseEntity.status(error.status).body(
+            BaseOutput(
+                errorCode = error.code,
+                errorMessage = error.message,
             ),
         )
     }

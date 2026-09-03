@@ -32,6 +32,8 @@ dependencies {
 	implementation("org.springframework.boot:spring-boot-starter-validation")
 	implementation("org.springframework.boot:spring-boot-starter-web")
 	implementation("org.springframework.boot:spring-boot-starter-aop")
+	implementation("org.springframework.boot:spring-boot-starter-actuator")
+	implementation("io.micrometer:micrometer-registry-prometheus")
 	implementation("io.github.resilience4j:resilience4j-spring-boot3:2.2.0")
 	implementation("com.querydsl:querydsl-jpa:5.1.0:jakarta")
 	implementation("org.apache.commons:commons-lang3:3.18.0")

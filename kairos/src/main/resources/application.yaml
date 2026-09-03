@@ -29,6 +29,23 @@ kairos:
       base-url: ${KAIROS_AI_GEMINI_BASE_URL:https://generativelanguage.googleapis.com}
       api-key: ${KAIROS_AI_GEMINI_API_KEY:}
 
+management:
+  server:
+    # 지표 엔드포인트는 내부 구조를 그대로 드러내므로 서비스 포트와 분리한다.
+    # Phase 5에서 이 포트는 VPC 안에서만 열리고 ALB로는 노출하지 않는다.
+    port: ${KAIROS_MANAGEMENT_PORT:9090}
+  endpoints:
+    web:
+      exposure:
+        # 필요한 것만 연다. 기본으로 열리는 env, beans 같은 것은 내부 설정을 그대로 보여준다.
+        include: health,info,prometheus
+  endpoint:
+    health:
+      show-details: never
+  metrics:
+    tags:
+      application: ${spring.application.name}
+
 logging:
   pattern:
     # 모든 로그에서 요청 추적용 traceId를 바로 확인할 수 있게 MDC 값을 붙인다.
