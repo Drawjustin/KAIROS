@@ -45,6 +45,12 @@ management:
   metrics:
     tags:
       application: ${spring.application.name}
+    distribution:
+      # p95 같은 분위수를 Prometheus 쪽에서 계산하려면 버킷이 함께 나가야 한다.
+      percentiles-histogram:
+        kairos.ai.request.duration: true
+      slo:
+        kairos.ai.request.duration: 500ms,1s,3s,10s,30s
 
 logging:
   pattern:

@@ -1,0 +1,14 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: kairos
+    metrics_path: /actuator/prometheus
+    static_configs:
+      # 애플리케이션은 호스트에서 실행하고 Prometheus만 컨테이너로 띄우는 로컬 구성이다.
+      # 컨테이너 안에서 호스트를 가리키려면 host.docker.internal을 써야 한다.
+      # AWS에서는 같은 서브넷의 사설 IP:9090으로 바뀐다.
+      - targets: ["host.docker.internal:9090"]
+        labels:
+          environment: local
