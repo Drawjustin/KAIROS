@@ -12,6 +12,7 @@ import io.github.drawjustin.kairos.pii.detector.PiiScanner
 import io.github.drawjustin.kairos.pii.detector.ResidentRegistrationNumberRule
 import io.github.drawjustin.kairos.pii.repository.PiiDetectionLogRepository
 import io.github.drawjustin.kairos.pii.repository.ProjectPiiPolicyRepository
+import io.github.drawjustin.kairos.observability.KairosMetrics
 import io.github.drawjustin.kairos.pii.service.PiiDetectionLoggingService
 import io.github.drawjustin.kairos.pii.service.PiiGuard
 import io.github.drawjustin.kairos.pii.service.PiiPolicyService
@@ -19,6 +20,7 @@ import io.github.drawjustin.kairos.pii.type.PiiAction
 import io.github.drawjustin.kairos.pii.type.PiiInspectionSource
 import io.github.drawjustin.kairos.pii.type.PiiType
 import io.github.drawjustin.kairos.project.entity.Project
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry
 import org.mockito.Mockito.mock
 
 // 다른 기능의 테스트가 DB 없이도 PiiGuard를 끼워 넣을 수 있게 하는 대역 모음이다.
@@ -55,7 +57,7 @@ private class FixedPiiPolicyService(
 }
 
 private class NoOpPiiDetectionLoggingService :
-    PiiDetectionLoggingService(mock(PiiDetectionLogRepository::class.java)) {
+    PiiDetectionLoggingService(mock(PiiDetectionLogRepository::class.java), KairosMetrics(SimpleMeterRegistry())) {
     override fun record(
         project: Project,
         source: PiiInspectionSource,

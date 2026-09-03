@@ -5,6 +5,7 @@ import io.github.drawjustin.kairos.budget.repository.ProjectBudgetRepository
 import io.github.drawjustin.kairos.budget.type.BudgetPeriod
 import io.github.drawjustin.kairos.common.error.KairosErrorCode
 import io.github.drawjustin.kairos.common.error.KairosException
+import io.github.drawjustin.kairos.observability.KairosMetrics
 import java.time.ZonedDateTime
 import org.springframework.stereotype.Service
 
@@ -20,6 +21,7 @@ import org.springframework.stereotype.Service
 class BudgetGuard(
     private val projectBudgetRepository: ProjectBudgetRepository,
     private val budgetProperties: BudgetProperties,
+    private val kairosMetrics: KairosMetrics,
 ) {
     // 한 project가 일 한도와 월 한도를 함께 둘 수 있으므로 모든 기간을 선점해야 통과다.
     // 중간에 하나라도 막히면 앞서 선점한 기간을 되돌린다. 되돌리지 않으면
@@ -38,6 +40,7 @@ class BudgetGuard(
 
             if (projectBudgetRepository.reserveRequest(projectId, period) == 0) {
                 releasePeriods(projectId, reservedPeriods)
+                kairosMetrics.recordBudgetRejection(period)
                 throw KairosException(
                     KairosErrorCode.AI_BUDGET_EXCEEDED,
                     "${period.name} 예산 한도를 초과했습니다",

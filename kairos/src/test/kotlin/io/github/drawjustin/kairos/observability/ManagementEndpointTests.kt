@@ -1,6 +1,13 @@
 package io.github.drawjustin.kairos.observability
 
 import io.github.drawjustin.kairos.IntegrationTestSupport
+import io.github.drawjustin.kairos.ai.type.AiModel
+import io.github.drawjustin.kairos.ai.type.AiProvider
+import io.github.drawjustin.kairos.ai.type.AiUsageStatus
+import io.github.drawjustin.kairos.budget.type.BudgetPeriod
+import io.github.drawjustin.kairos.pii.type.PiiAction
+import io.github.drawjustin.kairos.pii.type.PiiType
+import java.time.Duration
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
@@ -24,6 +31,9 @@ import org.springframework.test.context.TestPropertySource
 class ManagementEndpointTests : IntegrationTestSupport() {
     @Autowired
     lateinit var restTemplate: TestRestTemplate
+
+    @Autowired
+    lateinit var kairosMetrics: KairosMetrics
 
     @LocalServerPort
     var servicePort: Int = 0
@@ -73,6 +83,25 @@ class ManagementEndpointTests : IntegrationTestSupport() {
 
         assertThat(unknown.statusCode).isEqualTo(HttpStatus.NOT_FOUND)
         assertThat(unknown.body).contains("COMMON_002")
+    }
+
+    @Test
+    fun `exposes the control layer metrics in the scrape output`() {
+        // 통제 계층에서 만든 사건을 하나씩 발생시킨 뒤 실제 스크레이프 응답에 실리는지 본다.
+        kairosMetrics.recordAiRequest(AiModel.GPT_4O_MINI, AiUsageStatus.FAILED, Duration.ofMillis(3), "AI_014")
+        kairosMetrics.recordFallback(AiProvider.OPENAI, AiProvider.CLAUDE)
+        kairosMetrics.recordPiiDetection(PiiType.RESIDENT_REGISTRATION_NUMBER, PiiAction.BLOCK, 1)
+        kairosMetrics.recordBudgetRejection(BudgetPeriod.DAILY)
+
+        val scrape = get(managementPort, "/actuator/prometheus").body.orEmpty()
+
+        assertThat(scrape).contains("kairos_ai_request_total")
+        assertThat(scrape).contains("error_code=\"AI_014\"")
+        assertThat(scrape).contains("kairos_ai_fallback_total")
+        assertThat(scrape).contains("kairos_pii_detection_total")
+        assertThat(scrape).contains("kairos_budget_rejection_total")
+        // 서킷 상태는 Resilience4j가 알아서 올려준다.
+        assertThat(scrape).contains("resilience4j_circuitbreaker_state")
     }
 
     @Test

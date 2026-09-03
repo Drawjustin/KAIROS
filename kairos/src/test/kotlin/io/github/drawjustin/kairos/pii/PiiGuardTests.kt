@@ -12,6 +12,7 @@ import io.github.drawjustin.kairos.pii.detector.PiiMasker
 import io.github.drawjustin.kairos.pii.detector.PiiScanner
 import io.github.drawjustin.kairos.pii.detector.ResidentRegistrationNumberRule
 import io.github.drawjustin.kairos.pii.repository.PiiDetectionLogRepository
+import io.github.drawjustin.kairos.observability.KairosMetrics
 import io.github.drawjustin.kairos.pii.service.PiiDetectionLoggingService
 import io.github.drawjustin.kairos.pii.service.PiiGuard
 import io.github.drawjustin.kairos.pii.service.PiiPolicyService
@@ -24,6 +25,7 @@ import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 import org.mockito.BDDMockito.given
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.never
 import org.mockito.Mockito.times
@@ -171,7 +173,7 @@ class PiiGuardTests {
 
     // Mockito ArgumentCaptor는 Kotlin의 non-null 파라미터와 잘 맞지 않아 직접 기록하는 대역을 쓴다.
     private class RecordingDetectionLoggingService :
-        PiiDetectionLoggingService(mock(PiiDetectionLogRepository::class.java)) {
+        PiiDetectionLoggingService(mock(PiiDetectionLogRepository::class.java), KairosMetrics(SimpleMeterRegistry())) {
         val records = mutableListOf<LoggedDetection>()
 
         override fun record(

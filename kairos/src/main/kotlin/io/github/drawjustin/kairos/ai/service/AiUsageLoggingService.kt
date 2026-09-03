@@ -6,6 +6,8 @@ import io.github.drawjustin.kairos.ai.entity.AiUsageLog
 import io.github.drawjustin.kairos.ai.repository.AiUsageLogRepository
 import io.github.drawjustin.kairos.ai.type.AiUsageStatus
 import io.github.drawjustin.kairos.apikey.entity.ApiKey
+import io.github.drawjustin.kairos.observability.KairosMetrics
+import java.time.Duration
 import org.slf4j.MDC
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Propagation
@@ -15,6 +17,7 @@ import org.springframework.transaction.annotation.Transactional
 // AI 사용량 기록은 요청 성공/실패와 별개로 남아야 하므로 별도 트랜잭션으로 저장한다.
 class AiUsageLoggingService(
     private val aiUsageLogRepository: AiUsageLogRepository,
+    private val kairosMetrics: KairosMetrics,
 ) {
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     fun recordSuccess(
@@ -43,6 +46,13 @@ class AiUsageLoggingService(
                 fallbackFromModel = fallbackFromModel?.value,
             ),
         )
+        // 원장은 DB에, 운영 지표는 Prometheus에 남긴다. 같은 사건을 두 곳이 각자의 질문에 맞게 본다.
+        kairosMetrics.recordAiRequest(
+            model = model,
+            status = AiUsageStatus.SUCCESS,
+            latency = Duration.ofMillis(latencyMs),
+        )
+        fallbackFromModel?.let { kairosMetrics.recordFallback(it.provider, model.provider) }
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
@@ -63,6 +73,12 @@ class AiUsageLoggingService(
                 errorCode = errorCode,
                 traceId = currentTraceId(),
             ),
+        )
+        kairosMetrics.recordAiRequest(
+            model = model,
+            status = AiUsageStatus.FAILED,
+            latency = Duration.ofMillis(latencyMs),
+            errorCode = errorCode,
         )
     }
 
