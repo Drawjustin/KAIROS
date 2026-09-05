@@ -22,10 +22,15 @@ data "aws_availability_zones" "available" {
 # ---------- 서브넷 ----------
 
 resource "aws_subnet" "public" {
-  vpc_id                  = aws_vpc.main.id
-  cidr_block              = var.public_subnet_cidr
-  availability_zone       = data.aws_availability_zones.available.names[0]
-  map_public_ip_on_launch = false
+  vpc_id            = aws_vpc.main.id
+  cidr_block        = var.public_subnet_cidr
+  availability_zone = data.aws_availability_zones.available.names[0]
+
+  # NAT 인스턴스는 부팅 스크립트에서 패키지를 받아야 한다.
+  # Elastic IP는 인스턴스가 만들어진 뒤에 붙으므로, 그때까지 주소가 없으면
+  # user_data가 인터넷에 닿지 못해 Squid가 설치되지 않은 채로 뜬다.
+  # apply는 성공하는데 통제 지점만 비어 있는 상태가 되므로 기동 시점부터 주소를 준다.
+  map_public_ip_on_launch = true
 
   tags = { Name = "kairos-${var.environment}-public" }
 }

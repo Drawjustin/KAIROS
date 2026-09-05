@@ -22,6 +22,9 @@ resource "aws_instance" "nat" {
   # NAT 역할을 하려면 자기 앞으로 온 것이 아닌 패킷도 처리할 수 있어야 한다.
   source_dest_check = false
 
+  # 부팅 스크립트가 패키지를 받으려면 이 시점에 이미 주소가 있어야 한다.
+  associate_public_ip_address = true
+
   user_data = templatefile("${path.module}/userdata/nat.sh", {
     app_subnet_cidr = var.app_subnet_cidr
     allowed_domains = var.allowed_egress_domains
@@ -61,9 +64,17 @@ resource "aws_instance" "app" {
   iam_instance_profile   = aws_iam_instance_profile.instance.name
 
   user_data = templatefile("${path.module}/userdata/app.sh", {
-    proxy_host = aws_instance.nat.private_ip
+    proxy_host      = aws_instance.nat.private_ip
+    image_uri       = var.app_image_uri
+    app_subnet_cidr = var.app_subnet_cidr
+    package_host    = var.package_host
+    region          = var.region
   })
   user_data_replace_on_change = true
+
+  # 이 인스턴스는 NAT를 거치지 않으면 아무것도 받을 수 없다.
+  # 라우팅이 먼저 생기지 않으면 부팅 스크립트가 통째로 실패한다.
+  depends_on = [aws_route.app_egress]
 
   metadata_options {
     http_tokens = "required"

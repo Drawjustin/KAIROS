@@ -55,9 +55,13 @@ acl app_subnet src APP_SUBNET_CIDR
 acl SSL_ports port 443
 acl CONNECT method CONNECT
 
+# 규칙은 위에서부터 순서대로 평가된다. 거부가 허용보다 먼저 와야 의미가 있다.
+# 허용을 먼저 두면 허용 도메인으로 가는 443 이외의 포트까지 함께 열린다.
+http_access deny CONNECT !SSL_ports
+http_access deny !app_subnet
+
 # HTTPS는 CONNECT로 들어온다. 목적지 도메인만 보고 판정하며 내용은 복호화하지 않는다.
 http_access allow app_subnet allowed_domains
-http_access deny CONNECT !SSL_ports
 http_access deny all
 
 # 무엇이 통과하고 무엇이 막혔는지가 증거물이 된다.

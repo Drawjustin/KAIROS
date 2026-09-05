@@ -29,16 +29,24 @@ resource "aws_iam_role_policy" "flow_logs" {
 
   policy = jsonencode({
     Version = "2012-10-17"
-    Statement = [{
-      Effect = "Allow"
-      Action = [
-        "logs:CreateLogStream",
-        "logs:PutLogEvents",
-        "logs:DescribeLogGroups",
-        "logs:DescribeLogStreams",
-      ]
-      Resource = "${aws_cloudwatch_log_group.flow_logs.arn}:*"
-    }]
+    Statement = [
+      {
+        # 기록은 이 로그 그룹에만 할 수 있게 좁힌다.
+        Effect = "Allow"
+        Action = [
+          "logs:CreateLogStream",
+          "logs:PutLogEvents",
+        ]
+        Resource = "${aws_cloudwatch_log_group.flow_logs.arn}:*"
+      },
+      {
+        # Describe 계열은 목록 조회라 특정 로그 그룹 ARN으로 제한하면 호출 자체가 거부된다.
+        # 읽기 전용이고 내용이 아니라 존재 여부만 보는 권한이라 분리해서 허용한다.
+        Effect   = "Allow"
+        Action   = ["logs:DescribeLogGroups", "logs:DescribeLogStreams"]
+        Resource = "*"
+      },
+    ]
   })
 }
 

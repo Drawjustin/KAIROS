@@ -8,7 +8,16 @@ data "aws_region" "current" {}
 
 locals {
   # 세 개가 모두 있어야 Session Manager가 동작한다.
-  interface_endpoints = toset(["ssm", "ssmmessages", "ec2messages"])
+  session_manager_endpoints = ["ssm", "ssmmessages", "ec2messages"]
+
+  # ECR과 Secrets Manager는 AWS API라 프록시로 우회할 수 없다.
+  # NAT가 전달 트래픽의 443을 끊어 두었고, AWS API 주소는 프록시 예외로 잡혀 있어
+  # 엔드포인트가 없으면 호출이 그대로 실패한다.
+  # 인터넷이 없는 구간에서 AWS 서비스를 쓰려면 엔드포인트가 유일한 길이라는 뜻이다.
+  # 공개 레지스트리에서 이미지를 받으면 필요 없으므로 기본값은 끔이다.
+  aws_api_endpoints = var.enable_aws_api_endpoints ? ["ecr.api", "ecr.dkr", "secretsmanager"] : []
+
+  interface_endpoints = toset(concat(local.session_manager_endpoints, local.aws_api_endpoints))
 }
 
 resource "aws_vpc_endpoint" "interface" {
