@@ -6,6 +6,7 @@ import io.github.drawjustin.kairos.ai.dto.ChatMessageRequest
 import io.github.drawjustin.kairos.ai.provider.ProviderRouter
 import io.github.drawjustin.kairos.ai.tool.AiToolDefinition
 import io.github.drawjustin.kairos.ai.type.AiModel
+import io.github.drawjustin.kairos.apikey.entity.ApiKey
 import io.github.drawjustin.kairos.ai.type.ChatRole
 import io.github.drawjustin.kairos.budget.service.BudgetGuard
 import io.github.drawjustin.kairos.budget.service.BudgetReservation
@@ -72,42 +73,30 @@ class UnifiedAiService(
             )
         } catch (exception: KairosException) {
             budgetGuard.release(reservation)
-            aiUsageLoggingService.recordFailure(
-                apiKey = credential,
-                model = request.model,
-                latencyMs = elapsedMillis(startedAt),
-                errorCode = exception.errorCode.code,
-            )
+            recordFailureWithoutMaskingCause(credential, request.model, startedAt, exception.errorCode.code, exception)
             throw exception
         } catch (exception: CallNotPermittedException) {
             // 서킷이 열려 있어 호출조차 하지 않은 상태다.
             // 죽은 provider를 계속 두드리며 지연을 쌓는 대신 즉시 실패를 돌려준다.
             budgetGuard.release(reservation)
-            aiUsageLoggingService.recordFailure(
-                apiKey = credential,
-                model = request.model,
-                latencyMs = elapsedMillis(startedAt),
-                errorCode = KairosErrorCode.AI_PROVIDER_UNAVAILABLE.code,
+            val failure = KairosException(KairosErrorCode.AI_PROVIDER_UNAVAILABLE)
+            recordFailureWithoutMaskingCause(
+                credential, request.model, startedAt, KairosErrorCode.AI_PROVIDER_UNAVAILABLE.code, failure,
             )
-            throw KairosException(KairosErrorCode.AI_PROVIDER_UNAVAILABLE)
+            throw failure
         } catch (exception: BulkheadFullException) {
             // 동시 호출 제한에 걸린 것은 장애가 아니라 격리가 동작한 결과다.
             // 서버 오류로 묶어버리면 운영에서 진짜 장애와 구분할 수 없다.
             budgetGuard.release(reservation)
-            aiUsageLoggingService.recordFailure(
-                apiKey = credential,
-                model = request.model,
-                latencyMs = elapsedMillis(startedAt),
-                errorCode = KairosErrorCode.AI_PROVIDER_OVERLOADED.code,
+            val failure = KairosException(KairosErrorCode.AI_PROVIDER_OVERLOADED)
+            recordFailureWithoutMaskingCause(
+                credential, request.model, startedAt, KairosErrorCode.AI_PROVIDER_OVERLOADED.code, failure,
             )
-            throw KairosException(KairosErrorCode.AI_PROVIDER_OVERLOADED)
+            throw failure
         } catch (exception: Exception) {
             budgetGuard.release(reservation)
-            aiUsageLoggingService.recordFailure(
-                apiKey = credential,
-                model = request.model,
-                latencyMs = elapsedMillis(startedAt),
-                errorCode = KairosErrorCode.INTERNAL_SERVER_ERROR.code,
+            recordFailureWithoutMaskingCause(
+                credential, request.model, startedAt, KairosErrorCode.INTERNAL_SERVER_ERROR.code, exception,
             )
             throw exception
         }
@@ -116,13 +105,22 @@ class UnifiedAiService(
         // 호출 전에는 토큰 수를 알 수 없으므로 응답이 온 지금 실제 사용량으로 정산한다.
         budgetGuard.settle(reservation, callResult.response.usage?.totalTokens ?: 0)
         // 사용량은 실제로 응답한 모델 기준으로 남긴다. 대체가 일어났다면 원래 요청한 모델도 함께 기록한다.
-        aiUsageLoggingService.recordSuccess(
-            apiKey = credential,
-            model = callResult.model,
-            response = callResult.response,
-            latencyMs = latencyMs,
-            fallbackFromModel = callResult.fallbackFromModel,
-        )
+        //
+        // 기록에 실패하면 응답을 내보내지 않는다(fail-closed). 의도한 선택이다.
+        // 이미 발생한 호출 비용을 버리게 되지만, 누가 무엇을 외부로 보냈는지 남지 않은 채
+        // 결과만 나가면 그 호출은 사후에 재구성할 수 없다. 추적할 수 없는 호출이 비용보다 큰 문제다.
+        // 원장을 남기지 못했다는 사실 자체를 별도 코드로 구분해 일반 서버 오류와 섞이지 않게 한다.
+        try {
+            aiUsageLoggingService.recordSuccess(
+                apiKey = credential,
+                model = callResult.model,
+                response = callResult.response,
+                latencyMs = latencyMs,
+                fallbackFromModel = callResult.fallbackFromModel,
+            )
+        } catch (exception: Exception) {
+            throw KairosException(KairosErrorCode.AI_AUDIT_LOG_FAILED).apply { addSuppressed(exception) }
+        }
         return callResult.response
     }
 
@@ -194,6 +192,29 @@ class UnifiedAiService(
         val model: AiModel,
         val fallbackFromModel: AiModel? = null,
     )
+
+    // 실패 경로에서는 성공 경로와 반대로 기록 실패를 삼킨다.
+    // 요청은 어차피 실패로 끝나므로 막아야 할 "기록 없는 성공"이 존재하지 않고,
+    // 여기서 예외를 올리면 원래 실패 원인이 DB 오류로 바뀌어 진짜 문제를 못 보게 된다.
+    // 기록 실패 사실은 suppressed로 붙여 스택트레이스에 함께 남긴다.
+    private fun recordFailureWithoutMaskingCause(
+        credential: ApiKey,
+        model: AiModel,
+        startedAt: Long,
+        errorCode: String,
+        cause: Throwable,
+    ) {
+        try {
+            aiUsageLoggingService.recordFailure(
+                apiKey = credential,
+                model = model,
+                latencyMs = elapsedMillis(startedAt),
+                errorCode = errorCode,
+            )
+        } catch (exception: Exception) {
+            cause.addSuppressed(exception)
+        }
+    }
 
     private fun extractBearerToken(authorizationHeader: String?): String {
         val header = authorizationHeader?.trim().orEmpty()
