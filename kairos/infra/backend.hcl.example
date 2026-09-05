@@ -1,0 +1,4 @@
+# infra/bootstrap을 apply해서 나온 버킷 이름을 적고 backend.hcl로 복사한다.
+#   terraform init -backend-config=backend.hcl
+bucket = "kairos-tfstate-CHANGE-ME"
+region = "ap-northeast-2"

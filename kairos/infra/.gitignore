@@ -1,0 +1,13 @@
+# 상태 파일에는 리소스 ID와 일부 속성이 그대로 담긴다. 저장소에 올리지 않는다.
+*.tfstate
+*.tfstate.*
+.terraform/
+
+# .terraform.lock.hcl은 제외하지 않는다.
+# provider 버전과 해시를 고정해 어느 환경에서 init하든 같은 provider를 쓰게 만드는 파일이다.
+# package-lock.json과 같은 역할이라 저장소에 올리는 것이 맞다.
+
+# 계정마다 다른 값이라 예시 파일만 올린다.
+backend.hcl
+*.tfvars
+!*.tfvars.example
