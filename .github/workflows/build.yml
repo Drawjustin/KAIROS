@@ -1,0 +1,74 @@
+name: build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# 같은 브랜치에 연달아 올리면 앞선 실행은 취소한다. 러너 시간을 아끼고 결과가 뒤섞이지 않게 한다.
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    # Testcontainers가 매번 PostgreSQL을 새로 띄우므로 첫 실행은 이미지를 받는 시간이 더 걸린다.
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Build and test
+        working-directory: kairos
+        # 통합 테스트는 Testcontainers로 실제 PostgreSQL에 마이그레이션을 적용하고
+        # ddl-auto=validate로 엔티티와 스키마가 어긋나는지까지 확인한다.
+        # 러너에는 Docker가 이미 올라와 있어 별도 서비스 컨테이너가 필요 없다.
+        run: ./gradlew build --no-daemon
+
+      - name: Upload test report
+        # 실패했을 때 어떤 테스트가 왜 깨졌는지 보려면 리포트가 남아 있어야 한다.
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-report
+          path: kairos/build/reports/tests/test
+          retention-days: 7
+
+  image:
+    runs-on: ubuntu-latest
+    needs: test
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build image
+        uses: docker/build-push-action@v6
+        with:
+          context: kairos
+          # 아직 레지스트리에 올리지 않는다. 이미지가 실제로 만들어지는지만 확인한다.
+          # ECR push는 배포 대상이 생기는 시점에 붙인다.
+          push: false
+          load: true
+          tags: kairos:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Verify the image runs as a non-root user
+        # 컨테이너가 뚫렸을 때 host로 넘어갈 여지를 줄이는 설정이라 이미지가 바뀌어도 유지되어야 한다.
+        run: |
+          user="$(docker run --rm --entrypoint id kairos:ci -un)"
+          echo "image user: $user"
+          [ "$user" = "kairos" ]

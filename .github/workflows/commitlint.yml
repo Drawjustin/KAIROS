@@ -20,12 +20,16 @@ jobs:
           node-version: 20
 
       - name: Install commitlint tooling
+        # 워크플로는 저장소 루트에서 실행되지만 package.json은 애플리케이션 디렉토리에 있다.
+        working-directory: kairos
         run: npm install
 
       - name: Lint pull request commits
         if: github.event_name == 'pull_request'
+        working-directory: kairos
         run: npx commitlint --config commitlint.config.cjs --from "${{ github.event.pull_request.base.sha }}" --to "${{ github.event.pull_request.head.sha }}" --verbose
 
       - name: Lint pushed commits
         if: github.event_name == 'push'
+        working-directory: kairos
         run: npx commitlint --config commitlint.config.cjs --from "${{ github.event.before }}" --to "${{ github.event.after }}" --verbose
