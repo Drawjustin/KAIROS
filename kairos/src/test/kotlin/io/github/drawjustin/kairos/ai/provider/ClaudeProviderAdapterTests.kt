@@ -1,6 +1,8 @@
 package io.github.drawjustin.kairos.ai.provider
 
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
+import io.github.drawjustin.kairos.ai.provider.claude.AnthropicMessage
+import io.github.drawjustin.kairos.ai.provider.claude.AnthropicMessageRequest
 import io.github.drawjustin.kairos.pii.passThroughPiiGuard
 import io.github.drawjustin.kairos.ai.config.AnthropicProperties
 import io.github.drawjustin.kairos.ai.dto.ChatCompletionRequest
@@ -25,6 +27,22 @@ import org.springframework.web.client.RestClient
 
 class ClaudeProviderAdapterTests {
     private val objectMapper = jacksonObjectMapper()
+
+    @Test
+    fun `omits the tools field entirely when the project has no tools`() {
+        // Anthropic은 tools를 배열로만 받는다. "tools": null을 보내면 요청 전체를 거부하므로
+        // 도구가 연결되지 않은 project의 Claude 호출이 전부 실패한다.
+        val request = AnthropicMessageRequest(
+            model = "claude-haiku-4-5-20251001",
+            maxTokens = 512,
+            messages = listOf(AnthropicMessage(role = "user", content = "안녕")),
+        )
+
+        val json = jacksonObjectMapper().writeValueAsString(request)
+
+        assertThat(json).doesNotContain("tools")
+        assertThat(json).doesNotContain("null")
+    }
 
     @Test
     fun `chat completion executes allowed tool call and sends result back to Claude`() {

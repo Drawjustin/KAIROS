@@ -1,8 +1,13 @@
 package io.github.drawjustin.kairos.ai.provider.claude
 
+import com.fasterxml.jackson.annotation.JsonInclude
 import com.fasterxml.jackson.annotation.JsonProperty
 import io.github.drawjustin.kairos.ai.tool.AiToolParameters
 
+// null 필드는 아예 보내지 않는다.
+// Anthropic은 tools를 배열로만 받아서 "tools": null을 보내면 요청 전체를 거부한다.
+// 도구가 연결되지 않은 project는 tools가 비는데, 그 상태에서 Claude 호출이 전부 실패했다.
+@JsonInclude(JsonInclude.Include.NON_NULL)
 data class AnthropicMessageRequest(
     val model: String,
     @JsonProperty("max_tokens")
