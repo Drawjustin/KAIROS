@@ -58,7 +58,7 @@ resource "aws_eip" "nat" {
 
 resource "aws_instance" "app" {
   ami                    = data.aws_ssm_parameter.al2023_arm64.value
-  instance_type          = var.instance_type
+  instance_type          = var.app_instance_type
   subnet_id              = aws_subnet.app.id
   vpc_security_group_ids = [aws_security_group.app.id]
   iam_instance_profile   = aws_iam_instance_profile.instance.name
@@ -95,7 +95,7 @@ resource "aws_instance" "app" {
 
 resource "aws_instance" "workload" {
   ami                    = data.aws_ssm_parameter.al2023_arm64.value
-  instance_type          = var.instance_type
+  instance_type          = var.workload_instance_type
   subnet_id              = aws_subnet.workload.id
   vpc_security_group_ids = [aws_security_group.workload.id]
   iam_instance_profile   = aws_iam_instance_profile.instance.name

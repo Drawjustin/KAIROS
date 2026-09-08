@@ -34,8 +34,18 @@ variable "workload_subnet_cidr" {
   default     = "10.0.12.0/24"
 }
 
-variable "instance_type" {
-  description = "KAIROS와 업무망 인스턴스 타입"
+variable "app_instance_type" {
+  description = <<-EOT
+    KAIROS 인스턴스 타입.
+    절감 구성이라 같은 호스트에서 애플리케이션과 PostgreSQL을 함께 돌린다.
+    JVM 힙과 DB와 OS를 합치면 1GB로는 빠듯해 2GB짜리를 쓴다.
+  EOT
+  type        = string
+  default     = "t4g.small"
+}
+
+variable "workload_instance_type" {
+  description = "업무망 클라이언트 타입. 검증 명령만 실행하므로 최소 사양으로 충분하다."
   type        = string
   default     = "t4g.micro"
 }
