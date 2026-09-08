@@ -77,6 +77,28 @@ variable "enable_aws_api_endpoints" {
   default     = false
 }
 
+variable "postgres_image_uri" {
+  description = <<-EOT
+    PostgreSQL 컨테이너 이미지 주소.
+
+    Docker Hub의 CDN 도메인이 egress 허용 목록 밖이라 공개 레지스트리에서 받을 수 없다.
+    허용 목록을 넓히는 대신 이미지를 ECR에 올려 두고 그쪽에서 받는다.
+  EOT
+  type        = string
+  default     = ""
+}
+
+variable "provider_keys_secret_name" {
+  description = <<-EOT
+    AI provider API 키가 담긴 Secrets Manager 시크릿 이름.
+
+    Terraform이 이 시크릿을 만들지 않는다. 값을 Terraform이 알게 되면 상태 파일에
+    평문으로 남기 때문이다. 미리 넣어 두고 이름으로만 참조한다.
+  EOT
+  type        = string
+  default     = "kairos/demo/provider-keys"
+}
+
 variable "app_image_uri" {
   description = <<-EOT
     KAIROS 컨테이너 이미지 주소. 비워 두면 인프라만 세우고 애플리케이션은 올리지 않는다.

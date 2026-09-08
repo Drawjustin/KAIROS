@@ -64,11 +64,13 @@ resource "aws_instance" "app" {
   iam_instance_profile   = aws_iam_instance_profile.instance.name
 
   user_data = templatefile("${path.module}/userdata/app.sh", {
-    proxy_host      = aws_instance.nat.private_ip
-    image_uri       = var.app_image_uri
-    app_subnet_cidr = var.app_subnet_cidr
-    package_host    = var.package_host
-    region          = var.region
+    proxy_host           = aws_instance.nat.private_ip
+    image_uri            = var.app_image_uri
+    postgres_image_uri   = var.postgres_image_uri
+    app_subnet_cidr      = var.app_subnet_cidr
+    package_host         = var.package_host
+    region               = var.region
+    provider_secret_name = var.provider_keys_secret_name
   })
   user_data_replace_on_change = true
 

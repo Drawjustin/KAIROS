@@ -133,12 +133,73 @@ AWS에 올려 전부 실행했다. 아래는 편집하지 않은 출력이다.
 | | 시도 | 결과 | 증거 |
 | --- | --- | --- | --- |
 | A | 업무망에서 `curl https://api.openai.com` | 8초 타임아웃 | Flow Log에 외부 기록 0건 |
-| B | 같은 서버에서 KAIROS 호출 | 정상 응답 | 게이트웨이 자체 에러 형식 |
+| B | 같은 서버에서 KAIROS 통해 AI 호출 | **AI 답변 수신** | `ai_usage_log` 94토큰 기록 |
+| B' | 주민번호가 담긴 프롬프트 | 403 차단 | provider 미호출, 27ms |
+| B'' | 전화번호가 담긴 프롬프트 | 마스킹 후 통과 | 모델이 `010-****-5678` 반환 |
 | C | KAIROS에서 허용 목록 밖 도메인 | 차단 | Squid `TCP_DENIED/403` |
 | D | KAIROS에서 허용 도메인 | 통과 | provider가 401·405 응답 |
 | E | 업무망 SSH | 22번 포트 없음 | SSM Session Manager만 |
 
-#### A · B — 같은 서버에서
+#### 결론 — 같은 서버에서 인터넷은 막히고 AI 답변은 온다
+
+업무망 인스턴스 한 대에서 두 명령을 연달아 실행했다.
+
+```console
+$ curl https://api.openai.com/v1/models
+curl: (28) Connection timed out after 8000 milliseconds
+
+$ curl -X POST http://10.0.11.217:8080/api/v1/chat/completions \
+    -H "Authorization: Bearer kairos_sk_..." \
+    -d '{"model":"gpt-4o-mini","messages":[{"role":"user",
+         "content":"망분리가 무엇인지 한 문장으로 설명해줘."}]}'
+
+model  : gpt-4o-mini-2024-07-18
+answer : 망분리는 외부 네트워크와 내부 네트워크를 물리적으로 또는 논리적으로
+         분리하여 보안과 데이터 보호를 강화하는 기술입니다.
+tokens : {"prompt_tokens":59,"completion_tokens":35,"total_tokens":94}
+```
+
+**인터넷으로 나갈 수 없는 서버에서 AI 답변을 받았다.**
+경로는 `업무망 → KAIROS → Squid(허용 목록) → NAT → api.openai.com` 하나뿐이다.
+
+#### 민감정보는 나가기 전에 걸린다
+
+```console
+$ curl ... -d '{"messages":[{"content":"고객 홍길동 주민번호 900101-1234567 조회해줘"}]}'
+{"errorCode":"AI_011","errorMessage":"주민등록번호 이(가) 포함되어 요청을 차단했습니다"}
+HTTP 403
+```
+
+```console
+$ curl ... -d '{"messages":[{"content":"연락처 010-1234-5678 로 안내문 초안을 써줘"}]}'
+answer: 연락처 010-****-5678로 문의해 주시면 친절히 안내해 드리겠습니다.
+```
+
+두 번째가 특히 분명하다. **모델이 마스킹된 값을 그대로 되받았다.**
+원본 번호가 아니라 가려진 값이 실제로 provider까지 갔다는 뜻이고,
+마스킹이 전송 전에 일어났음을 모델의 답변이 증명한다.
+
+#### 원장은 traceId로 이어진다
+
+```
+ai_usage_log
+provider | model       | status  | error_code | tokens | latency | trace
+OPENAI   | gpt-4o-mini | SUCCESS |            |     94 |  3068ms | 653efd2bca8c
+OPENAI   | gpt-4o-mini | FAILED  | AI_011     |      0 |    27ms | b8954c6461d0
+OPENAI   | gpt-4o-mini | SUCCESS |            |     92 |  1483ms | 9ea1dea42a48
+
+pii_detection_log
+source      | pii_type                     | count | action | trace
+CHAT_PROMPT | RESIDENT_REGISTRATION_NUMBER |     1 | BLOCK  | b8954c6461d0
+CHAT_PROMPT | PHONE_NUMBER                 |     1 | MASK   | 9ea1dea42a48
+```
+
+`b8954c6461d0`은 주민번호로 차단된 요청, `9ea1dea42a48`은 전화번호를 가린 뒤 성공한 요청이다.
+차단이 27ms에 끝난 것은 provider를 부르지 않았기 때문이다.
+
+**검출 로그에는 값이 없다.** 어떤 종류가 몇 건 걸려 어떻게 처리됐는지만 남는다.
+
+#### 네트워크 경계 확인
 
 이 프로젝트의 결론이다. 업무망 인스턴스 한 대에서 두 명령을 연달아 실행했다.
 

@@ -23,7 +23,6 @@ export NO_PROXY="$NO_PROXY_LIST"
 echo "proxy=$PROXY" >> /etc/dnf/dnf.conf
 
 # 프록시가 뜨기 전에 이 스크립트가 먼저 도는 경우가 있다.
-# 두 인스턴스가 동시에 만들어지므로 몇 초에서 몇 분까지 벌어질 수 있다.
 for attempt in $(seq 1 60); do
   if curl -sS --max-time 5 --proxy "$PROXY" -o /dev/null "https://${package_host}/"; then
     break
@@ -47,7 +46,6 @@ PROXYCONF
 systemctl daemon-reload
 systemctl restart docker
 
-# 셸에서 확인할 때도 같은 경로를 쓰도록 맞춰 둔다.
 cat > /etc/profile.d/proxy.sh <<PROFILECONF
 export HTTP_PROXY="$PROXY"
 export HTTPS_PROXY="$PROXY"
@@ -55,77 +53,69 @@ export NO_PROXY="$NO_PROXY_LIST"
 PROFILECONF
 
 # ---------------------------------------------------------------------------
-# KAIROS와 데이터베이스
+# 자격 증명
 #
-# 절감 구성이라 RDS를 쓰지 않고 같은 호스트의 컨테이너로 띄운다.
-# 데모용이며, 실제 운영에서는 데이터 구간을 별도 서브넷의 관리형 DB로 분리한다.
+# DB 비밀번호와 JWT 비밀키는 부팅 때 만들어 이 호스트에만 둔다.
+# provider API 키는 Secrets Manager에서 받아 온다. 코드에도, 상태 파일에도,
+# 사용자 데이터에도 남지 않는다. Secrets Manager는 AWS API라 프록시로 우회되지 않으므로
+# VPC 엔드포인트를 통해서만 닿을 수 있다.
 # ---------------------------------------------------------------------------
 
-dnf install -y docker-compose-plugin || true
-
 mkdir -p /opt/kairos
-cat > /opt/kairos/compose.yaml <<'COMPOSE'
-services:
-  postgres:
-    image: postgres:16-alpine
-    restart: unless-stopped
-    environment:
-      POSTGRES_USER: kairos
-      POSTGRES_PASSWORD: $${POSTGRES_PASSWORD}
-      POSTGRES_DB: kairos
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U kairos"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
+POSTGRES_PASSWORD="$(openssl rand -hex 24)"
+JWT_SECRET="$(openssl rand -hex 32)"
 
-  kairos:
-    image: $${KAIROS_IMAGE}
-    restart: unless-stopped
-    depends_on:
-      postgres:
-        condition: service_healthy
-    environment:
-      SPRING_PROFILES_ACTIVE: prod
-      KAIROS_API_DB_URL: jdbc:postgresql://postgres:5432/kairos
-      KAIROS_API_DB_USERNAME: kairos
-      KAIROS_API_DB_PASSWORD: $${POSTGRES_PASSWORD}
-      KAIROS_JWT_SECRET: $${JWT_SECRET}
-      # 외부 provider 호출도 프록시를 지나야 한다.
-      JAVA_TOOL_OPTIONS: >-
-        -XX:MaxRAMPercentage=70
-        -Dhttp.proxyHost=$${PROXY_HOST} -Dhttp.proxyPort=3128
-        -Dhttps.proxyHost=$${PROXY_HOST} -Dhttps.proxyPort=3128
-        -Dhttp.nonProxyHosts=localhost|127.0.0.1|postgres
-    ports:
-      # 업무망이 부를 서비스 포트와, VPC 안에서만 여는 지표 포트.
-      - "8080:8080"
-      - "9090:9090"
+SECRET_JSON="$(aws secretsmanager get-secret-value \
+  --secret-id "${provider_secret_name}" --region "${region}" \
+  --query SecretString --output text 2>/dev/null || echo '{}')"
 
-volumes:
-  postgres_data:
-COMPOSE
+read_key() {
+  echo "$SECRET_JSON" | python3 -c "import sys,json; print(json.load(sys.stdin).get('$1',''))" 2>/dev/null || echo ""
+}
+OPENAI_KEY="$(read_key KAIROS_AI_OPENAI_API_KEY)"
+ANTHROPIC_KEY="$(read_key KAIROS_AI_ANTHROPIC_API_KEY)"
+GEMINI_KEY="$(read_key KAIROS_AI_GEMINI_API_KEY)"
 
-# 비밀번호는 코드에도 상태 파일에도 남기지 않는다. 부팅 때 만들어 이 호스트에만 둔다.
-cat > /opt/kairos/.env <<ENVFILE
-POSTGRES_PASSWORD=$(openssl rand -hex 24)
-JWT_SECRET=$(openssl rand -hex 32)
-KAIROS_IMAGE=${image_uri}
-PROXY_HOST=${proxy_host}
-ENVFILE
-chmod 600 /opt/kairos/.env
+# ---------------------------------------------------------------------------
+# KAIROS와 데이터베이스
+#
+# 절감 구성이라 같은 호스트의 컨테이너로 띄운다. 데모용이며 실제 운영에서는
+# 데이터 구간을 별도 서브넷의 관리형 DB로 분리한다.
+#
+# compose 플러그인은 Amazon Linux 2023 저장소에 없고, 컨테이너 이미지는
+# Docker Hub CDN이 허용 목록 밖이라 받을 수 없다. 두 이미지 모두 ECR에 올려 두고
+# docker run으로 직접 띄운다.
+# ---------------------------------------------------------------------------
 
-# 이미지 주소를 넘기지 않으면 인프라만 세우고 애플리케이션은 나중에 올린다.
 if [ -n "${image_uri}" ]; then
-  cd /opt/kairos
-  # ECR에서 받는 경우 로그인이 필요하다.
-  # 단 이 호출은 AWS API라 프록시로 우회되지 않으므로 enable_aws_api_endpoints가 켜져 있어야 한다.
-  # 공개 레지스트리에서 받는 구성이면 이 단계는 조용히 넘어간다.
   if echo "${image_uri}" | grep -q "dkr.ecr"; then
     aws ecr get-login-password --region "${region}" |
       docker login --username AWS --password-stdin "$(echo "${image_uri}" | cut -d/ -f1)"
   fi
-  docker compose up -d
+
+  docker network create kairos 2>/dev/null || true
+  docker rm -f postgres kairos 2>/dev/null || true
+
+  docker run -d --name postgres --network kairos --restart unless-stopped \
+    -e POSTGRES_USER=kairos -e POSTGRES_PASSWORD="$POSTGRES_PASSWORD" -e POSTGRES_DB=kairos \
+    -v postgres_data:/var/lib/postgresql/data "${postgres_image_uri}"
+
+  for i in $(seq 1 30); do
+    docker exec postgres pg_isready -U kairos >/dev/null 2>&1 && break
+    sleep 3
+  done
+
+  # provider 호출도 프록시를 지나야 한다. 허용 목록 밖으로는 나가지 못한다.
+  docker run -d --name kairos --network kairos --restart unless-stopped \
+    -p 8080:8080 -p 9090:9090 \
+    -e SPRING_PROFILES_ACTIVE=prod \
+    -e KAIROS_API_DB_URL=jdbc:postgresql://postgres:5432/kairos \
+    -e KAIROS_API_DB_USERNAME=kairos \
+    -e KAIROS_API_DB_PASSWORD="$POSTGRES_PASSWORD" \
+    -e KAIROS_JWT_SECRET="$JWT_SECRET" \
+    -e KAIROS_AI_OPENAI_API_KEY="$OPENAI_KEY" \
+    -e KAIROS_AI_ANTHROPIC_API_KEY="$ANTHROPIC_KEY" \
+    -e KAIROS_AI_GEMINI_API_KEY="$GEMINI_KEY" \
+    -e JAVA_TOOL_OPTIONS="-XX:MaxRAMPercentage=70 -Dhttps.proxyHost=${proxy_host} -Dhttps.proxyPort=3128 -Dhttp.proxyHost=${proxy_host} -Dhttp.proxyPort=3128 -Dhttp.nonProxyHosts=localhost|127.0.0.1|postgres" \
+    "${image_uri}"
 fi
