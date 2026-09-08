@@ -23,10 +23,13 @@ locals {
 resource "aws_vpc_endpoint" "interface" {
   for_each = local.interface_endpoints
 
-  vpc_id             = aws_vpc.main.id
-  service_name       = "com.amazonaws.${data.aws_region.current.name}.${each.value}"
-  vpc_endpoint_type  = "Interface"
-  subnet_ids         = [aws_subnet.app.id, aws_subnet.workload.id]
+  vpc_id            = aws_vpc.main.id
+  service_name      = "com.amazonaws.${data.aws_region.current.name}.${each.value}"
+  vpc_endpoint_type = "Interface"
+  # 인터페이스 엔드포인트는 가용영역당 서브넷을 하나만 받는다.
+  # app과 workload를 같은 AZ에 두었으므로 둘 다 넘기면 중복으로 거부된다.
+  # 엔드포인트 ENI는 VPC 안 어디서든 사설 IP로 닿으므로 서브넷 하나면 충분하다.
+  subnet_ids         = [aws_subnet.app.id]
   security_group_ids = [aws_security_group.vpc_endpoints.id]
   # 사설 DNS를 켜야 인스턴스가 평소 쓰던 주소 그대로 엔드포인트로 붙는다.
   private_dns_enabled = true

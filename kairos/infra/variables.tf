@@ -51,9 +51,15 @@ variable "workload_instance_type" {
 }
 
 variable "nat_instance_type" {
-  description = "NAT 겸 forward proxy 인스턴스 타입"
+  description = <<-EOT
+    NAT 겸 forward proxy 인스턴스 타입.
+
+    iptables와 Squid만 돌리므로 사양은 낮아도 되지만, 신규 AWS 무료 플랜 계정은
+    프리티어 대상 타입만 EC2로 만들 수 있고 t4g.nano는 그 목록에 없다.
+    목록은 `aws ec2 describe-instance-types --filters Name=free-tier-eligible,Values=true`로 확인한다.
+  EOT
   type        = string
-  default     = "t4g.nano"
+  default     = "t4g.micro"
 }
 
 variable "enable_aws_api_endpoints" {

@@ -22,6 +22,14 @@ resource "aws_iam_role_policy_attachment" "ssm" {
   policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
 }
 
+resource "aws_iam_role_policy_attachment" "ecr_pull" {
+  # ECR에서 이미지를 받으려면 인스턴스가 스스로 토큰을 발급받아야 한다.
+  # SSM 권한만으로는 되지 않고, 이 권한이 없으면 부팅 스크립트의 docker login이 막힌다.
+  # 읽기 전용이라 이미지를 밀어 넣지는 못한다.
+  role       = aws_iam_role.instance.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
+}
+
 resource "aws_iam_instance_profile" "instance" {
   name = "kairos-${var.environment}-instance"
   role = aws_iam_role.instance.name

@@ -117,6 +117,29 @@ ECR을 쓰려면 VPC 엔드포인트가 필요하고 그만큼 비용이 붙는�
 실무에서도 사내 미러를 두거나 같은 형태의 허용 목록을 유지한다.
 통제를 느슨하게 한 것이 아니라 목록에 명시했다는 점이 중요하다.
 
+## `-backend=false`를 조심할 것
+
+문법만 확인하려고 `terraform init -backend=false`를 실행하면 `.terraform/`의 backend 설정이
+지워지고, 이후 명령이 **빈 로컬 상태**를 보게 된다.
+
+실제로 이 구성을 처음 올렸을 때 그 상태에서 `terraform destroy`를 실행해 `0 destroyed`가
+나왔다. 리소스는 그대로 살아 있는데 지울 것이 없다고 판단한 것이다. 확인하지 않고
+넘어갔다면 EC2와 VPC 엔드포인트가 계속 과금됐을 것이다.
+
+```bash
+terraform validate                                        # 문법 검증은 이것으로 충분하다
+terraform init -backend-config=backend.hcl -reconfigure   # 검증 후 backend를 되살린다
+```
+
+**`destroy` 후에는 상태를 믿지 말고 실제 리소스를 확인한다.**
+
+```bash
+./check-empty.sh
+```
+
+EC2, VPC 엔드포인트, Elastic IP, NAT 게이트웨이, EBS 볼륨, VPC를 태그로 조회해
+과금 대상이 남았는지 본다. 상태 파일이 어긋나 있어도 이 스크립트는 실제를 본다.
+
 ## 검증 시나리오
 
 `terraform output verification_commands`가 그대로 실행 가능한 명령을 뱉는다.
