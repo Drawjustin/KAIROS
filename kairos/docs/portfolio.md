@@ -58,13 +58,13 @@ KAIROS는 이 세 조건을 하나의 계층에서 만족시키는 것을 목표
 VPC 10.0.0.0/16 · ap-northeast-2
 │
 ├─ Public    10.0.1.0/24    [0.0.0.0/0 → IGW]
-│    NAT + Squid (t4g.nano)
+│    NAT + Squid (t4g.micro)
 │      · NAT   : app 구간을 외부로 내보낸다
 │      · Squid : 도메인 허용 목록으로 판정한다
 │      · iptables : 전달 트래픽의 443/80을 끊어 프록시 우회를 막는다
 │
 ├─ App       10.0.11.0/24   [0.0.0.0/0 → NAT]
-│    KAIROS + PostgreSQL (t4g.micro)
+│    KAIROS + PostgreSQL (t4g.small)
 │
 └─ Workload  10.0.12.0/24   ★ 기본 경로 없음
      내부 클라이언트 (t4g.micro)
@@ -126,22 +126,99 @@ Squid는 HTTPS를 복호화하지 않습니다. `CONNECT`의 목적지 도메인
 
 업무망은 인터넷이 없으므로 SSM에 닿으려면 VPC 엔드포인트가 필요합니다. 인터넷 없는 구간에서 AWS 서비스를 쓰려면 엔드포인트가 유일한 길이라는 제약이 이 구성에서 드러납니다.
 
-### 검증 시나리오
+### 검증 시나리오 — 실제 실행 결과
 
-| | 시도 | 기대 | 증거 |
+AWS에 올려 전부 실행했다. 아래는 편집하지 않은 출력이다.
+
+| | 시도 | 결과 | 증거 |
 | --- | --- | --- | --- |
-| A | 업무망에서 `curl https://api.openai.com` | 차단 | VPC Flow Log `REJECT` |
-| B | 같은 서버에서 KAIROS 호출 | 정상 | 응답 + `ai_usage_log` |
-| C | KAIROS에서 `curl https://www.google.com` | 403 | Squid `access.log` |
-| D | KAIROS에서 허용 도메인 호출 | 정상 | Squid `access.log` |
-| E | 업무망에 SSH 접속 | 불가 | CloudTrail 세션 기록 |
+| A | 업무망에서 `curl https://api.openai.com` | 8초 타임아웃 | Flow Log에 외부 기록 0건 |
+| B | 같은 서버에서 KAIROS 호출 | 정상 응답 | 게이트웨이 자체 에러 형식 |
+| C | KAIROS에서 허용 목록 밖 도메인 | 차단 | Squid `TCP_DENIED/403` |
+| D | KAIROS에서 허용 도메인 | 통과 | provider가 401·405 응답 |
+| E | 업무망 SSH | 22번 포트 없음 | SSM Session Manager만 |
 
-> **여기에 실제 캡처를 넣으세요.**
-> **A와 B가 나란히 놓인 터미널 캡처 한 장**이 이 프로젝트의 최종 산출물입니다.
-> 같은 서버에서 인터넷은 타임아웃으로 끊기고 KAIROS 호출은 응답하는 화면입니다.
-> 아키텍처 다이어그램 열 장보다 그게 강합니다.
->
-> 함께 넣으면 좋은 것: VPC Flow Log의 `REJECT` 라인, Squid `access.log`의 `TCP_DENIED` 라인, Grafana 대시보드.
+#### A · B — 같은 서버에서
+
+이 프로젝트의 결론이다. 업무망 인스턴스 한 대에서 두 명령을 연달아 실행했다.
+
+```console
+$ curl https://api.openai.com
+curl: (28) Connection timed out after 8001 milliseconds
+
+$ curl http://10.0.11.42:9090/actuator/health
+{"status":"UP"}
+
+$ curl -X POST http://10.0.11.42:8080/api/v1/chat/completions -d '{}'
+{"errorCode":"COMMON_999","errorMessage":"Internal server error"}
+```
+
+세 번째 응답이 중요하다. 네트워크가 열려 있다는 것을 넘어 **게이트웨이가 요청을 받아
+처리하고 자신의 에러 형식으로 답했다**는 뜻이다. 애플리케이션이 살아 있다는 증거다.
+
+#### C · D — 단일 출구가 실제로 통제한다
+
+```console
+# 프록시를 우회한 직결 — NAT의 FORWARD REJECT에 막힌다
+$ curl --noproxy '*' https://api.openai.com
+000
+
+# 프록시 경유, 허용 목록 밖
+$ curl --proxy http://10.0.1.152:3128 https://www.google.com
+000
+
+# 프록시 경유, 허용 도메인
+$ curl --proxy http://10.0.1.152:3128 https://api.openai.com/v1/models
+HTTP 401
+$ curl --proxy http://10.0.1.152:3128 https://api.anthropic.com/v1/messages
+HTTP 405
+```
+
+**401과 405는 외부 provider가 직접 돌려준 응답이다.** 연결이 실제로 성립했고
+인증만 없었을 뿐이라는 뜻이라, 통과 경로가 살아 있음을 보여준다.
+
+Squid 판정 기록:
+
+```
+TCP_DENIED/403     www.google.com:443                 ← 허용 목록 밖
+TCP_TUNNEL/200     api.openai.com:443                 ← 허용
+TCP_TUNNEL/200     api.anthropic.com:443              ← 허용
+TCP_DENIED/403     production.cloudfront.docker.com   ← 목록에 없어 차단
+```
+
+#### E — 예상보다 강한 결과
+
+문서를 쓸 때는 업무망의 인터넷 시도가 VPC Flow Log에 `REJECT`로 남을 것이라 적었다.
+**실제로는 기록조차 남지 않았다.**
+
+```
+업무망(10.0.12.82) 발신 기록 119건 — 전부 VPC 내부
+
+  -> 10.0.11.219 :443    ACCEPT  x60     VPC 엔드포인트 (SSM)
+  -> 10.0.11.206 :443    ACCEPT  x46     VPC 엔드포인트
+  -> 10.0.11.45  :443    ACCEPT  x9      VPC 엔드포인트
+  -> 10.0.11.42  :8080   ACCEPT  x2      KAIROS 서비스
+  -> 10.0.11.42  :9090   ACCEPT  x2      KAIROS 지표
+
+외부로 향하는 기록: 0건
+```
+
+보안 그룹으로 막으면 패킷이 인터페이스에 도달한 뒤 거부되어 `REJECT`가 남는다.
+**경로가 없으면 라우팅 단계에서 사라져 기록조차 생기지 않는다.**
+
+> 이것이 "설정으로 막았다"와 "구조적으로 못 나간다"의 차이다.
+> 로그의 유무로 그 차이가 그대로 드러났다.
+
+업무망 라우팅 테이블:
+
+```
+10.0.0.0/16   -> local                     active
+(prefix list) -> vpce-0a4bfb8c3d52140f7    active     S3 게이트웨이 엔드포인트
+
+0.0.0.0/0     경로 없음
+```
+
+전체 기록은 [`docs/evidence/network-separation.md`](evidence/network-separation.md)에 있다.
 
 ---
 
@@ -483,6 +560,7 @@ OS 패키지 저장소와 컨테이너 레지스트리도 들어 있습니다. �
 - **계좌번호는 체크섬 검증이 불가능합니다.** 은행마다 자릿수 규칙이 달라, 형식이 겹치는 사업자등록번호와 유선전화를 제외하는 방식으로 오탐을 줄였습니다. 그래서 기본 정책이 차단이 아니라 마스킹입니다.
 - **재시도가 서킷 집계를 부풀립니다.** Retry가 CircuitBreaker보다 바깥이라 한 요청의 재시도가 슬라이딩 윈도우에 여러 건으로 기록됩니다. 동작은 정상이고 오히려 보수적이지만, 설정값이 보이는 그대로의 의미는 아닙니다.
 - **단일 AZ 구성입니다.** 망분리 서사를 보여주는 것이 목적이라 가용성 이중화는 범위 밖으로 두었습니다.
+- **신규 AWS 계정은 프리티어 대상 인스턴스 타입만 만들 수 있습니다.** 그래서 NAT에 `t4g.nano` 대신 `t4g.micro`를 썼습니다. 사양이 남지만 선택지가 없었습니다.
 - **RAG와 실제 사내 문서 연동은 범위 밖입니다.** Tool Calling과 MCP로 연결 규격까지 만들었고, 실제 검색 대상은 목업입니다.
 
 ---
