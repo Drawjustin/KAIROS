@@ -1,6 +1,11 @@
 # 상태 파일에는 리소스 ID와 일부 속성이 그대로 담긴다. 저장소에 올리지 않는다.
 *.tfstate
 *.tfstate.*
+
+# plan 파일에는 리소스 상세와 변수 값이 그대로 담긴다.
+# 상태 파일과 같은 이유로 저장소에 올리지 않는다.
+tfplan
+*.tfplan
 .terraform/
 
 # .terraform.lock.hcl은 제외하지 않는다.
