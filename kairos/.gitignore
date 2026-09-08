@@ -49,3 +49,6 @@ node_modules/
 ### Local Scratch ###
 jailbreak
 jailbreak.*
+
+# macOS가 디렉토리마다 만드는 파일. 저장소에 들어갈 이유가 없다.
+.DS_Store

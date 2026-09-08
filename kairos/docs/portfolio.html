@@ -1,0 +1,1470 @@
+<title>KAIROS</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Nanum+Myeongjo:wght@400;700;800&family=Noto+Sans+KR:wght@300;400;500;700&display=swap">
+
+<style>
+  :root {
+    --ground:      #EFEEE9;
+    --surface:     #FBFAF7;
+    --surface-2:   #E4E2DA;
+    --ink:         #15171B;
+    --ink-2:       #4A4E57;
+    --ink-3:       #767A83;
+    --line:        #D6D3C9;
+    --line-strong: #B4B0A3;
+
+    --accent:      #1E3A5F;
+    --accent-2:    #2C5688;
+    --accent-soft: #DCE3EC;
+
+    --deny:        #93322A;
+    --deny-soft:   #F0DFDB;
+    --allow:       #2C6349;
+    --allow-soft:  #DBE8E0;
+
+    --serif: "Nanum Myeongjo", Georgia, "Apple SD Gothic Neo", serif;
+    --sans:  "Noto Sans KR", -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", sans-serif;
+    --mono:  "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+
+    --maxw: 62rem;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground:      #101216;
+      --surface:     #181B21;
+      --surface-2:   #21252D;
+      --ink:         #E6E4DE;
+      --ink-2:       #A8ACB5;
+      --ink-3:       #787D87;
+      --line:        #262A32;
+      --line-strong: #3C414B;
+
+      --accent:      #7BA5D0;
+      --accent-2:    #9CBEE0;
+      --accent-soft: #17222F;
+
+      --deny:        #D4796B;
+      --deny-soft:   #2A1917;
+      --allow:       #6FA98B;
+      --allow-soft:  #16241D;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --ground:      #101216;
+    --surface:     #181B21;
+    --surface-2:   #21252D;
+    --ink:         #E6E4DE;
+    --ink-2:       #A8ACB5;
+    --ink-3:       #787D87;
+    --line:        #262A32;
+    --line-strong: #3C414B;
+
+    --accent:      #7BA5D0;
+    --accent-2:    #9CBEE0;
+    --accent-soft: #17222F;
+
+    --deny:        #D4796B;
+    --deny-soft:   #2A1917;
+    --allow:       #6FA98B;
+    --allow-soft:  #16241D;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 16px;
+    font-weight: 400;
+    line-height: 1.8;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap { max-width: var(--maxw); margin: 0 auto; padding: 0 1.5rem 6rem; }
+
+  /* ---------- masthead ---------- */
+
+  .masthead { padding: 5rem 0 2rem; }
+
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin: 0 0 1.5rem;
+  }
+
+  h1 {
+    font-family: var(--serif);
+    font-weight: 800;
+    font-size: clamp(2.6rem, 8vw, 4.5rem);
+    line-height: 1;
+    letter-spacing: 0.02em;
+    margin: 0 0 0.75rem;
+  }
+
+  .subtitle {
+    font-family: var(--serif);
+    font-weight: 400;
+    font-size: clamp(1.05rem, 2.6vw, 1.35rem);
+    line-height: 1.6;
+    color: var(--ink-2);
+    margin: 0 0 2rem;
+    max-width: 40rem;
+  }
+
+  .thesis {
+    border-top: 3px solid var(--ink);
+    border-bottom: 1px solid var(--line-strong);
+    padding: 1.5rem 0;
+    margin: 0 0 2rem;
+  }
+
+  .thesis p {
+    font-family: var(--serif);
+    font-weight: 700;
+    font-size: clamp(1.15rem, 3vw, 1.6rem);
+    line-height: 1.55;
+    margin: 0;
+    text-wrap: balance;
+  }
+
+  .facts {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(7.5rem, 1fr));
+    gap: 1px;
+    background: var(--line);
+    border: 1px solid var(--line);
+  }
+
+  .fact { background: var(--surface); padding: 0.9rem 1rem; }
+
+  .fact dt {
+    font-family: var(--mono);
+    font-size: 0.65rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+    margin: 0 0 0.25rem;
+  }
+
+  .fact dd {
+    margin: 0;
+    font-family: var(--mono);
+    font-size: 1.15rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    color: var(--ink);
+    line-height: 1.3;
+  }
+
+  .fact dd small { font-size: 0.7rem; font-weight: 400; color: var(--ink-3); }
+
+  /* ---------- sections ---------- */
+
+  section { padding-top: 4.5rem; }
+
+  .sec-head { margin-bottom: 2rem; }
+
+  .sec-num {
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    letter-spacing: 0.14em;
+    color: var(--accent);
+    display: block;
+    margin-bottom: 0.4rem;
+  }
+
+  h2 {
+    font-family: var(--serif);
+    font-weight: 800;
+    font-size: clamp(1.55rem, 4vw, 2.2rem);
+    line-height: 1.3;
+    letter-spacing: 0.01em;
+    margin: 0;
+    padding-bottom: 0.6rem;
+    border-bottom: 2px solid var(--ink);
+    text-wrap: balance;
+  }
+
+  h3 {
+    font-family: var(--serif);
+    font-weight: 700;
+    font-size: 1.15rem;
+    line-height: 1.5;
+    margin: 2.5rem 0 0.8rem;
+    color: var(--ink);
+  }
+
+  h4 {
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    font-weight: 500;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+    margin: 1.75rem 0 0.6rem;
+  }
+
+  p { margin: 0 0 1.1rem; max-width: 44rem; }
+  ul, ol { margin: 0 0 1.1rem; padding-left: 1.35rem; max-width: 44rem; }
+  li { margin-bottom: 0.5rem; }
+  li::marker { color: var(--ink-3); }
+
+  strong { font-weight: 700; }
+  em { font-style: normal; color: var(--accent); font-weight: 700; }
+
+  code {
+    font-family: var(--mono);
+    font-size: 0.85em;
+    background: var(--surface-2);
+    padding: 0.1em 0.35em;
+    border-radius: 2px;
+  }
+
+  a { color: var(--accent); }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  /* ---------- callout ---------- */
+
+  .lead {
+    font-family: var(--serif);
+    font-size: 1.1rem;
+    line-height: 1.75;
+    color: var(--ink);
+    border-left: 3px solid var(--accent);
+    padding-left: 1.1rem;
+    margin: 0 0 1.75rem;
+    max-width: 44rem;
+  }
+
+  .note {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-left: 3px solid var(--ink-3);
+    padding: 1rem 1.2rem;
+    margin: 1.5rem 0;
+    font-size: 0.92rem;
+    color: var(--ink-2);
+  }
+
+  .note p:last-child { margin-bottom: 0; }
+  .note .label {
+    font-family: var(--mono);
+    font-size: 0.65rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+    display: block;
+    margin-bottom: 0.4rem;
+  }
+
+  .todo {
+    border-left-color: var(--deny);
+    background: var(--deny-soft);
+    color: var(--ink-2);
+  }
+  .todo .label { color: var(--deny); }
+
+  /* ---------- VPC diagram ---------- */
+
+  .vpc {
+    border: 2px solid var(--ink);
+    background: var(--surface);
+    margin: 0 0 1.5rem;
+    overflow: hidden;
+  }
+
+  .vpc-head {
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    letter-spacing: 0.08em;
+    padding: 0.65rem 1rem;
+    background: var(--ink);
+    color: var(--ground);
+  }
+
+  .zones { display: grid; gap: 1px; background: var(--line); }
+  .zone { background: var(--surface); padding: 1rem 1.1rem; display: grid; gap: 0.6rem; }
+
+  .zone-top { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.45rem 0.8rem; }
+  .zone-name { font-weight: 700; font-size: 0.98rem; }
+  .zone-cidr { font-family: var(--mono); font-size: 0.75rem; color: var(--ink-3); }
+
+  .zone-route {
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    padding: 0.15rem 0.5rem;
+    margin-left: auto;
+    border-radius: 2px;
+    white-space: nowrap;
+  }
+
+  .zone-hosts { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+
+  .host {
+    font-family: var(--mono);
+    font-size: 0.73rem;
+    border: 1px solid var(--line-strong);
+    background: var(--ground);
+    padding: 0.25rem 0.5rem;
+    border-radius: 2px;
+    color: var(--ink-2);
+  }
+  .host.key { border-color: var(--accent); color: var(--accent); font-weight: 600; }
+
+  .zone.open { border-left: 5px solid var(--ink-3); }
+  .zone.ctrl { border-left: 5px solid var(--accent); }
+  .zone.iso  { border-left: 5px solid var(--deny); }
+
+  .zone.open .zone-route { background: var(--surface-2); color: var(--ink-2); }
+  .zone.ctrl .zone-route { background: var(--accent-soft); color: var(--accent-2); }
+  .zone.iso  .zone-route { background: var(--deny-soft); color: var(--deny); font-weight: 700; }
+
+  /* ---------- flows ---------- */
+
+  .flows { display: grid; gap: 0.6rem; margin: 0 0 1.75rem; }
+
+  .flow {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.7rem 0.9rem;
+    border: 1px solid var(--line);
+    background: var(--surface);
+    font-family: var(--mono);
+    font-size: 0.76rem;
+  }
+
+  .flow.allowed { border-left: 3px solid var(--allow); }
+  .flow.blocked { border-left: 3px solid var(--deny); }
+  .flow .arw { color: var(--ink-3); }
+  .flow .stop { color: var(--deny); font-weight: 700; }
+  .flow .tag { margin-left: auto; }
+
+  .pill {
+    display: inline-block;
+    font-family: var(--mono);
+    font-size: 0.67rem;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    padding: 0.12rem 0.45rem;
+    border-radius: 2px;
+    white-space: nowrap;
+  }
+  .pill.deny  { background: var(--deny-soft);  color: var(--deny); }
+  .pill.allow { background: var(--allow-soft); color: var(--allow); }
+
+  /* ---------- tables ---------- */
+
+  .table-scroll { overflow-x: auto; margin: 0 0 1.5rem; }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.88rem;
+    min-width: 32rem;
+    background: var(--surface);
+  }
+
+  th {
+    text-align: left;
+    font-family: var(--mono);
+    font-size: 0.66rem;
+    font-weight: 500;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+    padding: 0.6rem 0.85rem;
+    border-bottom: 2px solid var(--line-strong);
+    white-space: nowrap;
+  }
+
+  td {
+    padding: 0.7rem 0.85rem;
+    border-bottom: 1px solid var(--line);
+    vertical-align: top;
+    color: var(--ink-2);
+    line-height: 1.6;
+  }
+
+  td:first-child { color: var(--ink); font-weight: 500; }
+  tbody tr:last-child td { border-bottom: none; }
+  .num { font-family: var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+  /* ---------- evidence ---------- */
+
+  .evidence {
+    border: 1px solid var(--line-strong);
+    background: var(--surface);
+    margin: 1.5rem 0;
+  }
+
+  .evidence-head {
+    font-family: var(--mono);
+    font-size: 0.68rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 0.6rem 1rem;
+    border-bottom: 1px solid var(--line);
+    color: var(--ink-3);
+    background: var(--surface-2);
+  }
+
+  .evidence-body { padding: 1rem 1.1rem; }
+
+  .compare { display: grid; grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr)); gap: 1px; background: var(--line); }
+  .compare > div { background: var(--surface); padding: 0.9rem 1rem; }
+  .compare .who { font-family: var(--mono); font-size: 0.7rem; color: var(--ink-3); margin-bottom: 0.4rem; letter-spacing: 0.06em; }
+  .compare .val { font-family: var(--mono); font-size: 1.4rem; font-weight: 600; font-variant-numeric: tabular-nums; line-height: 1.2; }
+  .compare .bad .val { color: var(--deny); }
+  .compare .good .val { color: var(--allow); }
+  .compare .desc { font-size: 0.8rem; color: var(--ink-3); margin-top: 0.3rem; }
+
+  pre {
+    font-family: var(--mono);
+    font-size: 0.78rem;
+    line-height: 1.65;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-left: 3px solid var(--accent);
+    padding: 0.9rem 1rem;
+    overflow-x: auto;
+    margin: 0 0 1.25rem;
+    color: var(--ink);
+  }
+
+  /* ---------- decision list ---------- */
+
+  .decisions { display: grid; gap: 1px; background: var(--line); border: 1px solid var(--line); }
+
+  .decision { background: var(--surface); padding: 1.1rem 1.2rem; }
+
+  .decision .q {
+    font-family: var(--serif);
+    font-weight: 700;
+    font-size: 1rem;
+    line-height: 1.5;
+    margin-bottom: 0.5rem;
+    color: var(--ink);
+  }
+
+  .decision .a { font-size: 0.9rem; color: var(--ink-2); line-height: 1.7; margin: 0; max-width: none; }
+
+  /* ---------- module tree ---------- */
+
+  .tree {
+    font-family: var(--mono);
+    font-size: 0.78rem;
+    line-height: 1.85;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-left: 3px solid var(--accent);
+    padding: 1rem 1.1rem;
+    overflow-x: auto;
+    margin: 0 0 1.25rem;
+  }
+
+  .tree .mod { color: var(--ink); font-weight: 600; }
+  .tree .cmt { color: var(--ink-3); }
+
+  /* ---------- request flow ---------- */
+
+  .steps { counter-reset: step; display: grid; gap: 1px; background: var(--line); border: 1px solid var(--line); margin: 0 0 1.5rem; }
+
+  .step {
+    background: var(--surface);
+    padding: 0.85rem 1rem 0.85rem 3.2rem;
+    position: relative;
+  }
+
+  .step::before {
+    counter-increment: step;
+    content: counter(step, decimal-leading-zero);
+    position: absolute;
+    left: 1rem;
+    top: 0.9rem;
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    color: var(--ink-3);
+  }
+
+  .step .what { font-weight: 700; font-size: 0.94rem; line-height: 1.5; }
+  .step .why { font-size: 0.85rem; color: var(--ink-2); line-height: 1.65; margin-top: 0.2rem; }
+
+  .step.guard { background: var(--accent-soft); border-left: 3px solid var(--accent); }
+  .step.guard::before { color: var(--accent-2); }
+  .step.guard .what { color: var(--accent); }
+
+  /* ---------- struggle ---------- */
+
+  .struggle {
+    border: 1px solid var(--line-strong);
+    background: var(--surface);
+    margin: 0 0 1.5rem;
+  }
+
+  .struggle-head {
+    padding: 0.85rem 1.1rem;
+    border-bottom: 1px solid var(--line);
+    font-family: var(--serif);
+    font-weight: 700;
+    font-size: 1.02rem;
+    line-height: 1.5;
+  }
+
+  .struggle-body { padding: 0.2rem 1.1rem 1rem; }
+
+  .struggle dl { margin: 0; }
+  .struggle dt {
+    font-family: var(--mono);
+    font-size: 0.65rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+    margin-top: 0.9rem;
+  }
+  .struggle dd { margin: 0.25rem 0 0; font-size: 0.9rem; color: var(--ink-2); line-height: 1.7; }
+  .struggle dd strong { color: var(--ink); }
+
+  footer {
+    margin-top: 5rem;
+    padding-top: 1.25rem;
+    border-top: 3px solid var(--ink);
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    color: var(--ink-3);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem 1.5rem;
+  }
+
+  @media (max-width: 40rem) {
+    body { font-size: 15px; line-height: 1.75; }
+    .masthead { padding-top: 3rem; }
+  }
+</style>
+
+<div class="wrap">
+
+  <header class="masthead">
+    <p class="eyebrow">Enterprise AI Gateway · 개인 프로젝트</p>
+    <h1>KAIROS</h1>
+    <p class="subtitle">
+      기업이 생성형 AI를 도입할 때 생기는 통제 문제를 해결하는 백엔드 플랫폼.
+      모델을 대신 호출해 주는 프록시가 아니라, <strong>모델 위의 운영 계층</strong>을 표준화합니다.
+    </p>
+
+    <div class="thesis">
+      <p>업무망의 인터넷 접근은 0이지만 AI는 쓸 수 있다.<br>그리고 모든 호출은 기록된다.</p>
+    </div>
+
+    <dl class="facts">
+      <div class="fact"><dt>Language</dt><dd>Kotlin<br><small>Spring Boot 3.5 · JDK 21</small></dd></div>
+      <div class="fact"><dt>Commits</dt><dd>85</dd></div>
+      <div class="fact"><dt>Tests</dt><dd>131<small> 통과</small></dd></div>
+      <div class="fact"><dt>Migrations</dt><dd>V1–V13</dd></div>
+      <div class="fact"><dt>Infra</dt><dd>Terraform<br><small>AWS · 망분리</small></dd></div>
+    </dl>
+  </header>
+
+  <!-- =============== 01 =============== -->
+  <section id="problem">
+    <div class="sec-head">
+      <span class="sec-num">01</span>
+      <h2>왜 만들었나</h2>
+    </div>
+
+    <p class="lead">
+      금융권이 생성형 AI 도입에서 가장 먼저 막히는 지점은 성능이나 정확도가 아니라
+      <strong>통제</strong>입니다. 개인신용정보가 외부로 나가는 것을 막을 수 있는가,
+      누가 무엇을 보냈는지 사후에 재구성할 수 있는가, 그리고 그 통제가 망분리 규제 안에서
+      성립하는가입니다.
+    </p>
+
+    <p>
+      전자금융감독규정은 금융회사의 내부 업무망을 외부 통신망과 분리하도록 요구합니다.
+      최근 금융당국은 생성형 AI 활용을 위해 이 규제를 단계적으로 완화하는 방향을 제시했고,
+      완화의 조건은 대체로 <em>접근 통제 · 전송 데이터 통제 · 로깅</em>으로 모입니다.
+    </p>
+
+    <p>
+      KAIROS는 이 세 조건을 하나의 계층에서 만족시키는 것을 목표로 합니다.
+      업무망은 인터넷에 나갈 수 없고, 통제된 단일 출구 하나만 허용된다.
+      그 출구가 KAIROS입니다.
+    </p>
+
+    <h3>다루는 문제</h3>
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr><th>문제</th><th>KAIROS의 답</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>개인신용정보가 프롬프트에 실려 외부 LLM으로 나간다</td><td>전송 전에 차단하거나 가림. 검출 사실만 원문 없이 기록</td></tr>
+          <tr><td>어느 팀이 얼마나 쓰는지 통제되지 않는다</td><td>project 단위 호출·토큰 한도. 동시 요청에서도 정확</td></tr>
+          <tr><td>특정 provider 장애가 서비스 전체를 멈춘다</td><td>격리·차단·대체의 4단 방어</td></tr>
+          <tr><td>사후에 그 호출을 재구성할 수 없다</td><td>append-only 원장 + traceId로 연결되는 감사 로그</td></tr>
+          <tr><td>망분리 규제 안에서 이 모든 것이 성립해야 한다</td><td>업무망에 인터넷 경로를 두지 않고 KAIROS만 유일한 출구로</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- =============== 02 =============== -->
+  <section id="separation">
+    <div class="sec-head">
+      <span class="sec-num">02</span>
+      <h2>망분리 — 이 프로젝트의 중심</h2>
+    </div>
+
+    <p class="lead">
+      가장 중요한 설계 판단은 <strong>보안 그룹이 아니라 라우팅 테이블로 막았다</strong>는 것입니다.
+    </p>
+
+    <p>
+      보안 그룹은 규칙을 잘못 고치면 뚫립니다. <em>설정으로 막았다</em>는 상태입니다.
+      경로가 없는 서브넷은 나갈 방법 자체가 없습니다. <em>구조적으로 못 나간다</em>는 상태입니다.
+      이 차이가 감사에서 설명해야 하는 지점이고, KAIROS가 전체에 걸쳐 지킨 기준이기도 합니다.
+    </p>
+
+    <div class="vpc">
+      <div class="vpc-head">VPC 10.0.0.0/16 · ap-northeast-2</div>
+      <div class="zones">
+        <div class="zone open">
+          <div class="zone-top">
+            <span class="zone-name">Public</span>
+            <span class="zone-cidr">10.0.1.0/24</span>
+            <span class="zone-route">0.0.0.0/0 → IGW</span>
+          </div>
+          <div class="zone-hosts">
+            <span class="host key">NAT + Squid</span>
+            <span class="host">t4g.nano</span>
+          </div>
+        </div>
+
+        <div class="zone ctrl">
+          <div class="zone-top">
+            <span class="zone-name">App</span>
+            <span class="zone-cidr">10.0.11.0/24</span>
+            <span class="zone-route">0.0.0.0/0 → NAT</span>
+          </div>
+          <div class="zone-hosts">
+            <span class="host key">KAIROS</span>
+            <span class="host">PostgreSQL</span>
+            <span class="host">t4g.micro</span>
+          </div>
+        </div>
+
+        <div class="zone iso">
+          <div class="zone-top">
+            <span class="zone-name">Workload · 업무망</span>
+            <span class="zone-cidr">10.0.12.0/24</span>
+            <span class="zone-route">기본 경로 없음</span>
+          </div>
+          <div class="zone-hosts">
+            <span class="host">내부 클라이언트</span>
+            <span class="host">t4g.micro</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <p>
+      업무망 라우팅 테이블에는 <code>0.0.0.0/0</code> 경로가 없습니다.
+      Terraform 코드에서 확인해야 할 것은 무엇이 있는가가 아니라 <strong>무엇이 없는가</strong>입니다.
+    </p>
+
+    <h3>프록시를 KAIROS와 같은 호스트에 두지 않은 이유</h3>
+
+    <p>
+      프록시가 애플리케이션과 같은 호스트에 있으면, 프록시 설정을 지우는 것만으로 우회됩니다.
+      그러면 프록시는 통제가 아니라 권고사항입니다.
+    </p>
+
+    <p>
+      별도 인스턴스에 두고 <strong>전달 트래픽의 443을 끊으면</strong> 프록시를 거치지 않고는
+      나갈 수 없습니다. Squid는 그 인스턴스에서 자기 이름으로 나가므로
+      <code>OUTPUT</code> 체인을 타고 이 규칙에 걸리지 않습니다.
+    </p>
+
+    <div class="flows">
+      <div class="flow allowed">
+        <span>업무망</span><span class="arw">→</span>
+        <span>KAIROS</span><span class="arw">→</span>
+        <span>Squid</span><span class="arw">→</span>
+        <span>NAT</span><span class="arw">→</span>
+        <span>api.openai.com</span>
+        <span class="tag"><span class="pill allow">ALLOW</span></span>
+      </div>
+      <div class="flow blocked">
+        <span>업무망</span><span class="arw stop">╳</span><span>인터넷</span>
+        <span class="tag"><span class="pill deny">라우팅 없음</span></span>
+      </div>
+      <div class="flow blocked">
+        <span>KAIROS</span><span class="arw stop">╳</span><span>443 직결</span>
+        <span class="tag"><span class="pill deny">FORWARD REJECT</span></span>
+      </div>
+      <div class="flow blocked">
+        <span>KAIROS</span><span class="arw">→</span><span>Squid</span><span class="arw stop">╳</span><span>허용 목록 밖</span>
+        <span class="tag"><span class="pill deny">403</span></span>
+      </div>
+    </div>
+
+    <p>
+      Squid는 HTTPS를 복호화하지 않습니다. <code>CONNECT</code>의 목적지 도메인만 보고 판정합니다.
+      실무에서 AWS Network Firewall이나 보안 웹 게이트웨이가 맡는 역할을 비용 제약 때문에
+      대체한 것이며, 판정 방식은 동일합니다. 한계를 알고 대체했다는 점을 문서에 명시했습니다.
+    </p>
+
+    <h4>Terraform — 확인해야 할 것은 "무엇이 없는가"</h4>
+<pre>resource "aws_route_table" "workload" {
+  vpc_id = aws_vpc.main.id
+  <span style="color:var(--deny)"># 0.0.0.0/0 경로가 없다. 이 파일에서 가장 중요한 것은 없는 쪽이다.</span>
+  tags = { Note = "no default route on purpose" }
+}</pre>
+
+    <h4>NAT — 프록시를 우회한 직결을 끊는다</h4>
+<pre># app 구간을 외부로 내보내되
+iptables -t nat -A POSTROUTING -s 10.0.11.0/24 -o "$PRIMARY_IF" -j MASQUERADE
+
+# 전달되는 443/80은 끊는다. 프록시를 거치지 않으면 나갈 수 없다.
+iptables -A FORWARD -s 10.0.11.0/24 -p tcp --dport 443 -j REJECT
+iptables -A FORWARD -s 10.0.11.0/24 -p tcp --dport 80  -j REJECT
+
+# Squid는 이 호스트에서 자기 이름으로 나가므로 OUTPUT 체인을 타고 위 규칙에 걸리지 않는다.</pre>
+
+    <h4>Squid — 거부가 허용보다 먼저</h4>
+<pre>acl allowed_domains dstdomain "/etc/squid/allowed_domains.txt"
+acl app_subnet      src 10.0.11.0/24
+
+# 규칙은 위에서부터 평가된다. 허용을 먼저 두면
+# 허용 도메인으로 가는 443 이외의 포트까지 함께 열린다.
+http_access deny  CONNECT !SSL_ports
+http_access deny  !app_subnet
+http_access allow app_subnet allowed_domains
+http_access deny  all</pre>
+
+    <h3>접속은 SSH가 아니라 SSM으로</h3>
+    <p>
+      22번 포트를 아예 열지 않았습니다. bastion도 키 파일도 없습니다.
+      무엇보다 <strong>누가 언제 어느 인스턴스에 붙었는지가 CloudTrail에 남습니다.</strong>
+      감사 관점에서 SSH 대비 가장 큰 차이입니다.
+    </p>
+    <p>
+      업무망은 인터넷이 없으므로 SSM에 닿으려면 VPC 엔드포인트가 필요합니다.
+      인터넷 없는 구간에서 AWS 서비스를 쓰려면 엔드포인트가 유일한 길이라는 제약이
+      이 구성에서 드러납니다.
+    </p>
+
+    <h3>검증 시나리오</h3>
+    <p>
+      설계가 의도대로 동작하는지를 문서가 아니라 <strong>실행 결과</strong>로 확인합니다.
+    </p>
+
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr><th></th><th>시도</th><th>기대</th><th>증거</th></tr>
+        </thead>
+        <tbody>
+          <tr><td class="num">A</td><td>업무망에서 <code>curl https://api.openai.com</code></td><td><span class="pill deny">차단</span></td><td>VPC Flow Log <code>REJECT</code></td></tr>
+          <tr><td class="num">B</td><td>같은 서버에서 KAIROS 호출</td><td><span class="pill allow">정상</span></td><td>응답 + <code>ai_usage_log</code></td></tr>
+          <tr><td class="num">C</td><td>KAIROS에서 <code>curl https://www.google.com</code></td><td><span class="pill deny">403</span></td><td>Squid <code>access.log</code></td></tr>
+          <tr><td class="num">D</td><td>KAIROS에서 허용 도메인 호출</td><td><span class="pill allow">정상</span></td><td>Squid <code>access.log</code></td></tr>
+          <tr><td class="num">E</td><td>업무망에 SSH 접속</td><td><span class="pill deny">불가</span></td><td>CloudTrail 세션 기록</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="note todo">
+      <span class="label">여기에 실제 캡처를 넣으세요</span>
+      <p>
+        <strong>A와 B가 나란히 놓인 터미널 캡처 한 장</strong>이 이 프로젝트의 최종 산출물입니다.
+        같은 서버에서 인터넷은 타임아웃으로 끊기고 KAIROS 호출은 응답하는 화면입니다.
+        아키텍처 다이어그램 열 장보다 그게 강합니다.
+      </p>
+      <p>
+        함께 넣으면 좋은 것: VPC Flow Log의 <code>REJECT</code> 라인, Squid <code>access.log</code>의
+        <code>TCP_DENIED</code> 라인, Grafana 대시보드.
+      </p>
+    </div>
+  </section>
+
+
+  <!-- =============== 03 아키텍처 =============== -->
+  <section id="architecture">
+    <div class="sec-head">
+      <span class="sec-num">03</span>
+      <h2>아키텍처와 요청 흐름</h2>
+    </div>
+
+    <p class="lead">
+      모듈은 기술 계층이 아니라 <strong>책임</strong>으로 나눴습니다.
+      <code>controller / service / repository</code>로 먼저 자르면 기능이 커질수록
+      한 패키지 안에 관계없는 것들이 쌓입니다.
+    </p>
+
+    <div class="tree"><span class="mod">auth</span>       <span class="cmt">JWT 발급·검증, refresh 세션</span>
+<span class="mod">user</span>       <span class="cmt">계정, 전역 역할(USER/ADMIN)</span>
+<span class="mod">tenant</span>     <span class="cmt">조직 경계, tenant 내 역할(OWNER/ADMIN/MEMBER)</span>
+<span class="mod">project</span>    <span class="cmt">기능 단위, 허용 모델 정책</span>
+<span class="mod">apikey</span>     <span class="cmt">project 단위 호출 자격 증명</span>
+<span class="mod">ai</span>         <span class="cmt">Unified Chat API, provider 어댑터·라우터, 사용량 원장</span>
+ ├ provider  <span class="cmt">openai / claude / gemini — 형식 변환만 담당</span>
+ ├ tool      <span class="cmt">provider 중립 tool 정의</span>
+ └ service   <span class="cmt">호출 오케스트레이션</span>
+<span class="mod">context</span>    <span class="cmt">사내 자료 검색 API, 검색 감사 로그</span>
+<span class="mod">mcp</span>        <span class="cmt">개발 AI 도구용 JSON-RPC 엔드포인트</span>
+<span class="mod">pii</span>        <span class="cmt">민감정보 검출·마스킹, 정책, 검출 로그</span>
+<span class="mod">budget</span>     <span class="cmt">한도 예약·정산·보상</span>
+<span class="mod">observability</span> <span class="cmt">지표 정의, 관리 포트 경계 검사</span>
+<span class="mod">common</span>     <span class="cmt">에러 코드, traceId 필터, HTTP 타임아웃</span></div>
+
+    <p>
+      <code>pii</code>, <code>budget</code>, <code>observability</code>는 나중에 붙었지만
+      기존 모듈을 열어 고칠 필요가 거의 없었습니다. 통제가 들어갈 자리가
+      <em>호출 오케스트레이션 한 곳</em>으로 모여 있었기 때문입니다.
+    </p>
+
+    <h3>요청 하나가 지나는 길</h3>
+    <p>
+      <code>POST /api/v1/chat/completions</code> 하나에 통제 계층이 순서대로 걸립니다.
+      <strong>순서 자체가 설계 판단</strong>입니다.
+    </p>
+
+    <div class="steps">
+      <div class="step">
+        <div class="what">API key 인증</div>
+        <div class="why">JWT가 아니라 project 단위 API key. 호출 주체가 사람이 아니라 서비스이기 때문입니다.</div>
+      </div>
+      <div class="step guard">
+        <div class="what">허용 모델 검사</div>
+        <div class="why">가장 싼 검사를 앞에 둡니다. 정책 위반이면 여기서 끝냅니다.</div>
+      </div>
+      <div class="step guard">
+        <div class="what">민감정보 검사 · 마스킹</div>
+        <div class="why">외부로 나가기 전 마지막 지점. 차단되면 예산을 쓰지 않습니다.</div>
+      </div>
+      <div class="step guard">
+        <div class="what">예산 선점</div>
+        <div class="why">차단될 요청이 먼저 한도를 갉아먹으면 정상 요청이 밀려납니다.</div>
+      </div>
+      <div class="step">
+        <div class="what">provider 라우팅 · 호출</div>
+        <div class="why">Bulkhead → CircuitBreaker → Retry가 겹겹이 감쌉니다. 실패하면 허용된 다른 provider로.</div>
+      </div>
+      <div class="step">
+        <div class="what">tool 실행 (필요 시)</div>
+        <div class="why">모델이 사내 문서를 요청하면 KAIROS가 대신 실행하고, <strong>그 결과도 다시 민감정보 검사를 거칩니다.</strong></div>
+      </div>
+      <div class="step guard">
+        <div class="what">토큰 정산 · 원장 기록</div>
+        <div class="why">응답이 와야 토큰 수가 확정됩니다. 원장에 못 남기면 응답을 내보내지 않습니다.</div>
+      </div>
+    </div>
+
+    <div class="note">
+      <span class="label">provider 어댑터가 하는 일과 하지 않는 일</span>
+      <p>
+        어댑터는 <strong>형식 변환만</strong> 합니다. OpenAI의 <code>tool_call</code>,
+        Claude의 <code>tool_use</code>, Gemini의 <code>functionCall</code>을 공통 형식으로
+        옮기는 것까지입니다. 인증·정책·한도·기록은 전부 그 바깥에 있어서,
+        새 provider를 붙일 때 통제를 다시 구현하지 않습니다.
+      </p>
+    </div>
+  </section>
+
+  <!-- =============== 04 인증·권한 =============== -->
+  <section id="authz">
+    <div class="sec-head">
+      <span class="sec-num">04</span>
+      <h2>인증·권한과 정책 계층</h2>
+    </div>
+
+    <p class="lead">
+      사람이 부르는 경로와 서비스가 부르는 경로를 <strong>다른 자격 증명</strong>으로 나눴습니다.
+    </p>
+
+    <div class="table-scroll">
+      <table>
+        <thead><tr><th>경로</th><th>자격 증명</th><th>권한 판정</th></tr></thead>
+        <tbody>
+          <tr><td>플랫폼 관리 API</td><td>JWT (access / refresh)</td><td>전역 역할 + tenant 내 역할</td></tr>
+          <tr><td>Unified Chat API</td><td>project API key</td><td>project 정책 (허용 모델·도구)</td></tr>
+          <tr><td>Context API · MCP</td><td>JWT</td><td>사용자가 속한 tenant의 project만</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>경계는 두 겹</h3>
+    <p>
+      <code>tenant</code>는 조직 경계, <code>project</code>는 기능 단위입니다.
+      금융지주라면 tenant가 계열사, project가 그 안의 개별 AI 기능이 됩니다.
+      비용도 정책도 감사 로그도 이 두 축으로 갈립니다.
+    </p>
+    <p>
+      역할은 전역(<code>USER</code>/<code>ADMIN</code>)과 tenant 내
+      (<code>OWNER</code>/<code>ADMIN</code>/<code>MEMBER</code>)로 분리했습니다.
+      전역 관리자와 특정 계열사의 관리자는 다른 권한이기 때문입니다.
+    </p>
+
+    <h3>API key는 원문을 저장하지 않는다</h3>
+<pre>// 발급 시 원문은 한 번만 응답에 실리고, DB에는 해시만 남는다.
+val credential = apiKeyRepository
+    .findByKeyHashAndDeletedAtIsNullAndRevokedAtIsNull(tokenHasher.hash(apiKey))
+    ?: throw KairosException(AI_INVALID_API_KEY)
+
+if (credential.expiresAt?.isBefore(Instant.now()) == true)  throw ... // 만료
+if (credential.project.status != ProjectStatus.ACTIVE)      throw ... // project 비활성</pre>
+
+    <p>
+      키가 유출되어도 DB 덤프만으로는 재사용할 수 없고,
+      <strong>만료·폐기·project 상태를 매 호출마다 확인</strong>합니다.
+      폐기는 삭제가 아니라 <code>revoked_at</code> 기록이라, 사후에 "언제부터 막혔나"를 답할 수 있습니다.
+    </p>
+
+    <h3>정책은 project에 붙는다</h3>
+    <ul>
+      <li><strong>허용 모델</strong> — 같은 게이트웨이를 써도 project마다 쓸 수 있는 모델이 다릅니다</li>
+      <li><strong>허용 자료원</strong> — AI가 접근할 수 있는 사내 문서 범위</li>
+      <li><strong>민감정보 정책</strong> — 타입별 차단/마스킹/통과</li>
+      <li><strong>예산</strong> — 일·월 단위 호출·토큰 한도</li>
+    </ul>
+    <p>
+      민감정보 정책 테이블은 <em>비어 있는 것이 정상</em>입니다.
+      기본값을 코드가 들고 있어 한 건도 넣지 않아도 통제가 동작하고,
+      기본값과 다르게 운영할 때만 행이 생깁니다. 새 project를 만들 때 seed가 필요 없습니다.
+    </p>
+  </section>
+
+  
+  <!-- =============== 05 =============== -->
+  <section id="controls">
+    <div class="sec-head">
+      <span class="sec-num">05</span>
+      <h2>통제 계층 네 가지</h2>
+    </div>
+
+    <p class="lead">
+      망분리가 <strong>바깥 경계</strong>라면, 이 네 가지는 그 안에서 호출 하나하나에 적용되는
+      <strong>안쪽 통제</strong>입니다.
+    </p>
+
+    <h3>① 민감정보 통제 — 나가기 전에 막는다</h3>
+
+    <p>
+      주민등록번호, 외국인등록번호, 카드번호, 계좌번호, 휴대전화, 이메일, 여권번호 7종을
+      검출합니다. 정규식만으로 끝내지 않고 <strong>카드번호는 Luhn 체크섬</strong>,
+      <strong>주민번호는 생년월일 유효성</strong>을 함께 확인합니다. 오탐으로 서비스를 못 쓰게
+      만들면 결국 우회되고, 우회된 통제는 없는 것과 같기 때문입니다.
+    </p>
+
+    <h4>검사 지점 세 곳</h4>
+    <p>
+      한 곳만 막으면 구멍이 남습니다. 사용자 프롬프트, <strong>사내 문서 검색 결과가
+      provider로 되돌아가는 경로</strong>, 개발 AI 도구가 보낸 검색 질의 — 세 곳 모두를 지납니다.
+      두 번째가 가장 놓치기 쉬운 경로입니다.
+    </p>
+
+    <h4>감사 로그가 유출 경로가 되지 않도록</h4>
+    <p>
+      검출 로그에는 원문도, 마스킹 전 값도, 값의 일부도 저장하지 않습니다.
+      남기는 것은 <em>어떤 타입이 몇 건 검출되어 어떻게 처리됐는가</em>뿐이고,
+      요청 단위 추적은 <code>traceId</code>로 다른 로그와 이어 붙입니다.
+      차단 응답 메시지에도 값이 담기지 않도록 테스트로 못 박았습니다.
+    </p>
+
+    <div class="evidence">
+      <div class="evidence-head">성능 측정에서 찾은 서비스 거부 취약점</div>
+      <div class="evidence-body">
+        <p style="margin-bottom:0.9rem">
+          이메일 정규식에만 앞쪽 경계 검사가 빠져 있어, 정규식 엔진이 모든 위치에서 재시도했습니다.
+          비용이 입력 길이의 제곱으로 늘어 <strong>프롬프트 하나로 CPU를 몇 분간 붙잡을 수 있었습니다.</strong>
+          모든 AI 요청이 거치는 계층이라 보안 기능이 그 자체로 공격 통로가 된 사례입니다.
+        </p>
+        <div class="compare">
+          <div class="bad">
+            <div class="who">수정 전</div>
+            <div class="val">120초 +</div>
+            <div class="desc">20,000자 메시지 50개 · 타임아웃</div>
+          </div>
+          <div class="good">
+            <div class="who">수정 후</div>
+            <div class="val">104 ms</div>
+            <div class="desc">동일 입력</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <h3>② 한도·예산 통제 — 동시 요청에서도 정확하게</h3>
+
+    <p>
+      AI 호출은 <strong>실행 전에 소비량을 알 수 없습니다.</strong> 토큰 수는 응답이 와야 확정됩니다.
+      그래서 카드 결제의 <em>승인 → 매입 → 취소</em>와 같은 예약·정산·보상 구조로 설계했습니다.
+    </p>
+
+    <p>
+      한도 판정은 애플리케이션이 하지 않습니다. 조건을 <code>UPDATE</code> 문의
+      <code>WHERE</code> 절에 넣어 DB의 행 단위 원자성에 맡기고, 애플리케이션은
+      영향받은 행 수만 봅니다.
+    </p>
+
+<pre>UPDATE project_budget
+   SET consumed_requests = consumed_requests + 1
+ WHERE project_id = :projectId
+   AND consumed_requests + 1 &lt;= request_limit    -- 0행이면 한도 초과</pre>
+
+    <p>
+      비관적 락은 AI 응답을 기다리는 수 초 동안 행을 잡아 처리량을 무너뜨리고,
+      낙관적 락은 경합이 심한 단일 행에서 재시도가 폭증합니다.
+      트랜잭션 경계도 <code>UPDATE</code> 하나 단위로 잡아, 호출을 감싸는 트랜잭션 안에서
+      잠금이 유지되지 않게 했습니다.
+    </p>
+
+    <div class="evidence">
+      <div class="evidence-head">동시성 검증 · 가상 스레드 300개 동시 요청 / 한도 100</div>
+      <div class="evidence-body">
+        <div class="compare">
+          <div class="bad">
+            <div class="who">조회 후 판정</div>
+            <div class="val">300 / 5</div>
+            <div class="desc">300건 전부 통과 · 원장은 갱신 손실로 5</div>
+          </div>
+          <div class="good">
+            <div class="who">조건부 원자적 UPDATE</div>
+            <div class="val">100 / 100</div>
+            <div class="desc">정확히 한도만큼 · 원장 일치</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <h3>③ 장애 격리 — 네 겹의 방어</h3>
+
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr><th>장치</th><th>막는 문제</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Timeout</td><td>무한 대기. <strong>이게 없으면 서킷 브레이커는 열리지 않는다</strong></td></tr>
+          <tr><td>Bulkhead</td><td>느려진 provider 하나가 스레드 풀 전체를 잠식하는 것. 대기 없이 즉시 거절</td></tr>
+          <tr><td>CircuitBreaker</td><td>죽은 provider를 계속 두드리며 지연을 쌓는 것</td></tr>
+          <tr><td>Retry</td><td>일시적 오류. <strong>4xx는 재시도하지 않는다</strong></td></tr>
+          <tr><td>Fallback</td><td>project가 이미 허용한 다른 provider로 서비스 연속성 확보</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p>
+      <strong>4xx로 서킷을 열면 안 됩니다.</strong> provider는 멀쩡한데 우리 요청이 잘못된
+      상황에서 서킷을 열면 스스로 길을 막는 셈입니다. Resilience4j 판정을 예외 타입이 아니라
+      에러코드로 하도록 predicate를 따로 두었습니다.
+    </p>
+
+    <p>
+      대체 후보는 <code>project_allowed_model</code>에서만 고릅니다.
+      허용된 대체 모델이 없으면 대체하지 않고 그대로 실패합니다 —
+      <em>가용성보다 통제를 우선한 선택</em>입니다.
+      장애 대응이 권한 통제를 우회하면 "장애가 났으니 정책 밖 모델로 우회했다"는 사고가 됩니다.
+    </p>
+
+    <h3>④ 실패를 한 덩어리로 세지 않는다</h3>
+
+    <p>
+      통제가 작동한 것과 장애가 난 것을 같은 그래프로 보면 운영에서 구분할 수 없습니다.
+      에러코드로 나눠 세고, 그 코드가 그대로 대시보드의 계열이 됩니다.
+    </p>
+
+    <div class="table-scroll">
+      <table>
+        <thead><tr><th>코드</th><th>의미</th><th>성격</th></tr></thead>
+        <tbody>
+          <tr><td class="num">AI_011</td><td>민감정보 차단</td><td>통제가 작동함</td></tr>
+          <tr><td class="num">AI_012</td><td>예산 한도 초과</td><td>통제가 작동함</td></tr>
+          <tr><td class="num">AI_013</td><td>동시 호출 격리</td><td>통제가 작동함</td></tr>
+          <tr><td class="num">AI_014</td><td>provider 장애 · 서킷 차단</td><td>바깥이 죽음</td></tr>
+          <tr><td class="num">AI_015</td><td>호출은 성공했으나 원장에 못 남김</td><td>즉시 알림 대상</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+  </section>
+
+  <!-- =============== 06 MCP =============== -->
+  <section id="mcp">
+    <div class="sec-head">
+      <span class="sec-num">06</span>
+      <h2>내부 자료 연동 — Tool Calling과 MCP</h2>
+    </div>
+
+    <p class="lead">
+      AI가 사내 문서를 직접 뒤지는 것이 아니라,
+      <strong>KAIROS가 허용된 도구만 대신 실행하고 결과만 돌려줍니다.</strong>
+    </p>
+
+    <h3>provider 중립 tool 정의</h3>
+    <p>
+      provider마다 tool 형식이 다릅니다. project에 연결된 자료원을 공통
+      <code>AiToolDefinition</code>으로 바꾸고, 어댑터가 각 provider 형식으로 옮깁니다.
+      자료원을 추가할 때 provider별로 세 번 고치지 않습니다.
+    </p>
+
+    <div class="steps">
+      <div class="step"><div class="what">project에 연결된 자료원 조회</div>
+        <div class="why">허용되지 않은 자료원은 애초에 모델에게 알려주지 않습니다.</div></div>
+      <div class="step"><div class="what">공통 tool 정의로 변환</div>
+        <div class="why">provider별 <code>tool_call</code> / <code>tool_use</code> / <code>functionCall</code>로 전개.</div></div>
+      <div class="step"><div class="what">모델이 도구를 선택</div></div>
+      <div class="step guard"><div class="what">허용 여부 재검증</div>
+        <div class="why">모델이 돌려준 도구 이름을 그대로 믿지 않습니다. project 정책으로 한 번 더 확인합니다.</div></div>
+      <div class="step"><div class="what">KAIROS가 대신 실행</div>
+        <div class="why">모델은 내부 시스템에 직접 닿지 않습니다.</div></div>
+      <div class="step guard"><div class="what">결과에 민감정보 검사</div>
+        <div class="why">사내 문서에 담긴 고객정보가 provider로 되돌아가는 경로입니다.</div></div>
+      <div class="step"><div class="what">결과를 모델에 전달, 최종 응답</div></div>
+    </div>
+
+    <h3>개발 AI 도구를 위한 MCP 엔드포인트</h3>
+    <p>
+      Claude Code 같은 도구가 사내 개발 문서를 참조할 때도 같은 정책을 지나야 합니다.
+      <code>/mcp</code>에서 JSON-RPC로 <code>initialize · ping · tools/list · tools/call</code>을
+      처리하고, 노출하는 도구는 세 개입니다.
+    </p>
+    <div class="table-scroll">
+      <table>
+        <thead><tr><th>도구</th><th>역할</th></tr></thead>
+        <tbody>
+          <tr><td class="num">kairos_list_projects</td><td>접근 가능한 project 목록</td></tr>
+          <tr><td class="num">kairos_list_context_sources</td><td>그 project가 쓸 수 있는 자료원</td></tr>
+          <tr><td class="num">kairos_search_context</td><td>권한 범위 안에서 검색</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>
+      MCP 경로도 JWT 인증을 거치고 <strong>기존 검색 정책 계층을 그대로 재사용</strong>합니다.
+      새 진입점을 만들면서 통제를 다시 짜면 그 지점이 구멍이 됩니다.
+    </p>
+  </section>
+
+  <!-- =============== 07 관측·추적 =============== -->
+  <section id="observability">
+    <div class="sec-head">
+      <span class="sec-num">07</span>
+      <h2>관측과 추적</h2>
+    </div>
+
+    <p class="lead">
+      감사에서 답해야 하는 질문은 <strong>"그 호출을 재구성할 수 있는가"</strong>입니다.
+      로그가 흩어져 있으면 답할 수 없습니다.
+    </p>
+
+    <h3>traceId로 세 개의 로그를 잇는다</h3>
+<pre>// 요청마다 부여하고 응답 헤더로 돌려준다. 외부에서 넘어온 값이 있으면 이어받는다.
+val traceId = request.getHeader("X-Trace-Id")?.takeIf { it.isNotBlank() }
+    ?: UUID.randomUUID().toString().replace("-", "")
+
+MDC.put("traceId", traceId)
+response.setHeader("X-Trace-Id", traceId)
+// 서블릿 스레드가 재사용되기 전에 반드시 비운다
+finally { MDC.clear() }</pre>
+
+    <p>
+      같은 <code>traceId</code>가 애플리케이션 로그, <code>ai_usage_log</code>(호출 원장),
+      <code>context_search_log</code>(자료 검색), <code>pii_detection_log</code>(민감정보 검출)에
+      함께 남습니다. <strong>원문 없이도 하나의 요청을 재구성</strong>할 수 있는 이유입니다.
+    </p>
+
+    <div class="table-scroll">
+      <table>
+        <thead><tr><th>로그</th><th>남기는 것</th><th>남기지 않는 것</th></tr></thead>
+        <tbody>
+          <tr><td><code>ai_usage_log</code></td><td>provider·모델·토큰·지연·상태·에러코드·대체 이력</td><td>프롬프트 내용</td></tr>
+          <tr><td><code>context_search_log</code></td><td>검사를 마친 질의, 자료원, 결과 수</td><td>차단된 원문 질의</td></tr>
+          <tr><td><code>pii_detection_log</code></td><td>타입·건수·처리 방식</td><td><strong>값의 어떤 조각도</strong></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>원장은 append-only</h3>
+    <p>
+      사용량 로그에는 수정·삭제 흐름을 두지 않았습니다. provider와 모델 이름도
+      enum이 아니라 <strong>호출 시점의 문자열 스냅샷</strong>으로 저장합니다.
+      나중에 enum이 바뀌어도 과거 기록의 해석이 달라지지 않습니다.
+    </p>
+
+    <h3>집계는 DB, 건강 상태는 지표</h3>
+    <p>
+      "어느 project가 얼마나 썼는가"는 QueryDSL 집계 API가 답합니다 —
+      tenant/project 단위 요약, project별·provider별·모델별 분해.
+      지표에는 넣지 않습니다. <code>project</code>는 계속 늘어나는 값이라
+      태그로 쓰면 시계열이 무제한이 되기 때문입니다.
+    </p>
+    <p>
+      지표는 <em>시스템이 지금 건강한가</em>만 봅니다. 태그는 전부 enum이라
+      운영 중에 종류가 늘어날 수 없고, 실수로 늘어나는 값을 넣으면 테스트가 막습니다.
+    </p>
+  </section>
+
+  <!-- =============== 08 막혔던 지점 =============== -->
+  <section id="struggles">
+    <div class="sec-head">
+      <span class="sec-num">08</span>
+      <h2>막혔던 지점과 해결 과정</h2>
+    </div>
+
+    <p class="lead">
+      전부 <strong>테스트는 통과하는데 숨어 있던</strong> 문제들입니다.
+      기능을 더 붙이는 대신 이미 만든 것을 다시 재보는 데 시간을 썼습니다.
+    </p>
+
+    <div class="struggle">
+      <div class="struggle-head">① 보안 기능이 서비스 거부 통로가 되어 있었다</div>
+      <div class="struggle-body">
+        <dl>
+          <dt>증상</dt>
+          <dd>민감정보 검출 성능을 재보다가, 숫자만 긴 입력에서 <strong>입력이 2배면 시간이 4배</strong>가 되는 것을 발견했습니다.</dd>
+          <dt>원인</dt>
+          <dd>규칙 일곱 개 중 이메일 정규식에만 앞쪽 경계 검사가 빠져 있었습니다. 정규식 엔진이 모든 시작 위치에서 재시도하면서 비용이 입력 길이의 제곱으로 늘었습니다.</dd>
+          <dt>해결</dt>
+          <dd>나머지 규칙이 모두 갖고 있던 경계 검사를 붙이고 각 구간에 상한을 두었습니다. <strong>120초 초과 → 104ms</strong>. 20,000자 메시지 50개 기준입니다.</dd>
+          <dt>배운 것</dt>
+          <dd>모든 요청이 지나는 계층은 정확성만큼 <strong>비용의 상한</strong>이 중요합니다. 회귀 테스트로 2초 제한을 걸어 두었습니다.</dd>
+        </dl>
+      </div>
+    </div>
+
+    <div class="struggle">
+      <div class="struggle-head">② 한도 통제가 정말 동작하는지 스스로 의심했다</div>
+      <div class="struggle-body">
+        <dl>
+          <dt>상황</dt>
+          <dd>조건부 원자적 <code>UPDATE</code>로 한도를 지키게 만들고 테스트도 통과했지만, <strong>이 테스트가 정말 의미가 있는지</strong> 확신이 없었습니다. 잘못 만든 구현도 통과할 수 있기 때문입니다.</dd>
+          <dt>확인 방법</dt>
+          <dd>일부러 <strong>조회 후 판정</strong> 방식을 임시로 만들어 같은 조건(가상 스레드 300 동시 요청, 한도 100)으로 돌렸습니다.</dd>
+          <dt>결과</dt>
+          <dd>조회 후 판정은 <strong>300건이 모두 통과</strong>했고 원장은 갱신 손실로 5에 머물렀습니다. 조건부 UPDATE는 정확히 100건만 통과시켰습니다.</dd>
+          <dt>배운 것</dt>
+          <dd>동시성 테스트는 <strong>틀린 구현이 실패하는지</strong>까지 확인해야 의미가 생깁니다.</dd>
+        </dl>
+      </div>
+    </div>
+
+    <div class="struggle">
+      <div class="struggle-head">③ 락을 피하려고 만든 구조가 락이 될 뻔했다</div>
+      <div class="struggle-body">
+        <dl>
+          <dt>증상</dt>
+          <dd>예산 리포지토리 테스트가 <code>No EntityManager with actual transaction available</code>로 전부 실패했습니다.</dd>
+          <dt>고민</dt>
+          <dd><code>@Transactional</code>을 붙이면 되는 문제였지만 <strong>어디에 붙이느냐</strong>가 설계의 성패였습니다. 예약·AI 호출·정산을 한 트랜잭션으로 묶으면, 응답을 기다리는 수 초 동안 예산 행의 잠금이 유지됩니다.</dd>
+          <dt>해결</dt>
+          <dd><code>UPDATE</code> 하나가 자기만의 짧은 트랜잭션에서 끝나게 리포지토리 메서드 단위로 경계를 잡았습니다. 비관적 락을 피하려고 만든 구조가 그대로 비관적 락이 되는 것을 막았습니다.</dd>
+        </dl>
+      </div>
+    </div>
+
+    <div class="struggle">
+      <div class="struggle-head">④ 장애 대응이 중간에 끊겼다</div>
+      <div class="struggle-body">
+        <dl>
+          <dt>증상</dt>
+          <dd>대체 provider 후보가 여럿일 때, 첫 후보가 요청을 거절하면 <strong>남은 정상 provider를 시도하지 않고</strong> 요청이 끝났습니다.</dd>
+          <dt>영향</dt>
+          <dd>사용자는 원래 장애가 아니라 마지막 후보가 낸 엉뚱한 오류를 받았습니다. 아직 멀쩡한 provider가 있는데도요.</dd>
+          <dt>해결</dt>
+          <dd>후보 실패는 원래 예외에 <code>suppressed</code>로 붙여 두고 다음 후보로 넘어가게 했습니다. 모두 실패하면 원래 장애를 그대로 돌려줍니다.</dd>
+          <dt>배운 것</dt>
+          <dd>예외 흐름은 정상 흐름보다 테스트가 얕아지기 쉽습니다. 시나리오를 하나 더 늘려서야 드러났습니다.</dd>
+        </dl>
+      </div>
+    </div>
+
+    <div class="struggle">
+      <div class="struggle-head">⑤ 설정 한 줄이 빠지면 지표가 공개되고 있었다</div>
+      <div class="struggle-body">
+        <dl>
+          <dt>배경</dt>
+          <dd>지표 엔드포인트에 인증을 걸지 않는 대신 <strong>포트 자체를 경계</strong>로 삼았습니다. Prometheus가 주기적으로 긁어갈 때마다 토큰을 요구할 수 없기 때문입니다.</dd>
+          <dt>문제</dt>
+          <dd>그 전제가 깨지면 아무것도 막지 않습니다. 관리 포트 설정을 비운 상태로 실행하니 <strong>서비스 포트에서 전체 지표가 인증 없이 200</strong>으로 나왔습니다.</dd>
+          <dt>해결</dt>
+          <dd>설정으로 막는 대신 <strong>그런 설정으로는 기동하지 않게</strong> 했습니다. 엔드포인트를 끄는 값은 노출 위험이 없으므로 허용합니다.</dd>
+        </dl>
+      </div>
+    </div>
+
+    <div class="struggle">
+      <div class="struggle-head">⑥ 인프라를 올리기 전에 여섯 군데가 깨져 있었다</div>
+      <div class="struggle-body">
+        <dl>
+          <dt>배경</dt>
+          <dd><code>terraform validate</code>는 문법만 봅니다. 실제로 올려보면 돈은 나가는데 시스템이 뜨지 않는 종류의 문제는 잡히지 않습니다.</dd>
+          <dt>찾은 것</dt>
+          <dd>대표적으로, NAT 인스턴스에 <strong>Elastic IP가 붙기 전에 기동 스크립트가 실행</strong>되어 프록시가 설치되지 않은 채 뜨는 문제였습니다. <code>apply</code>는 성공하고 통제 지점만 비어 있는 상태가 됩니다. 그 밖에 프록시 설정보다 먼저 패키지를 받으려 한 것, Squid 규칙 순서가 뒤집힌 것 등 여섯 건입니다.</dd>
+          <dt>확인 방법</dt>
+          <dd>기동 스크립트를 <strong>실제로 렌더링해</strong> iptables·Squid 규칙을 눈으로 확인하고 셸 문법까지 검사했습니다.</dd>
+          <dt>배운 것</dt>
+          <dd>인프라 코드도 "검증이 통과했다"와 "동작한다"는 다릅니다. 올리기 전에 재볼 수 있는 것은 재보는 편이 시간과 비용 모두 아꼈습니다.</dd>
+        </dl>
+      </div>
+    </div>
+  </section>
+
+  <!-- =============== 09 =============== -->
+  <section id="decisions">
+    <div class="sec-head">
+      <span class="sec-num">09</span>
+      <h2>설계 판단</h2>
+    </div>
+
+    <p class="lead">
+      기능 목록보다 이쪽이 이 프로젝트의 내용에 가깝습니다.
+      각 판단에는 <strong>포기한 것</strong>이 있습니다.
+    </p>
+
+    <div class="decisions">
+      <div class="decision">
+        <div class="q">감사 기록에 실패하면 응답을 버린다</div>
+        <p class="a">
+          provider 호출은 성공했는데 원장에 남기지 못하면 응답을 내보내지 않습니다.
+          이미 발생한 비용을 버리게 되지만, 누가 무엇을 외부로 보냈는지 기록 없이 결과만 나가면
+          그 호출은 사후에 재구성할 수 없습니다. <strong>추적할 수 없는 호출이 비용보다 큰 문제</strong>라는 판단입니다.
+          반대로 실패 경로에서는 기록 실패를 삼킵니다 — 요청이 어차피 실패로 끝나 막아야 할
+          "기록 없는 성공"이 없고, 여기서 예외를 올리면 원래 실패 원인이 DB 오류로 바뀌어 진짜 문제를 가립니다.
+        </p>
+      </div>
+
+      <div class="decision">
+        <div class="q">민감정보 검사가 예산 선점보다 먼저</div>
+        <p class="a">
+          차단될 요청이 먼저 한도를 갉아먹으면 정작 정상 요청이 밀려납니다.
+          주민번호를 반복 전송하는 것만으로 그 project의 하루 한도를 소진시킬 수 있게 됩니다.
+        </p>
+      </div>
+
+      <div class="decision">
+        <div class="q">검색 질의 검사는 예외 처리 바깥에서</div>
+        <p class="a">
+          차단된 질의가 catch 블록으로 흘러가면 원문이 검색 감사 로그에 그대로 적재됩니다.
+          막으려던 유출이 감사 로그로 새는 셈이라 검사 순서를 뒤집었습니다.
+          차단 사실은 별도 로그에 남으므로 감사에 공백은 생기지 않습니다.
+        </p>
+      </div>
+
+      <div class="decision">
+        <div class="q">기간 초기화를 스케줄러로 하지 않는다</div>
+        <p class="a">
+          스케줄러를 두면 인스턴스가 여러 대일 때 중복 실행 문제가 새로 생깁니다.
+          요청 시점의 조건부 <code>UPDATE</code>로 처리하면 자정 직후 동시에 들어온 요청 중
+          정확히 하나만 초기화에 성공합니다.
+        </p>
+      </div>
+
+      <div class="decision">
+        <div class="q">토큰은 사후 정산이라 한 요청만큼 초과될 수 있다</div>
+        <p class="a">
+          호출 전에 토큰 수를 알 수 없으므로 구조적으로 불가피한 오차입니다.
+          정산에는 한도 조건을 걸지 않습니다 — 이미 발생한 사용량을 남기지 않으면 원장이 어긋나고,
+          한도를 넘긴 상태는 다음 요청의 예약이 막습니다.
+        </p>
+      </div>
+
+      <div class="decision">
+        <div class="q">허용 목록에 provider 도메인만 있는 것은 아니다</div>
+        <p class="a">
+          OS 패키지 저장소와 컨테이너 레지스트리도 들어 있습니다. 인터넷이 없는 구간에서
+          부팅하려면 어딘가는 열려야 하기 때문이고, 실무에서도 사내 미러를 두거나 같은 형태의
+          목록을 유지합니다. <strong>통제를 느슨하게 한 것이 아니라 목록에 명시했다는 점</strong>이 다릅니다.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- =============== 05 =============== -->
+  <section id="stack">
+    <div class="sec-head">
+      <span class="sec-num">10</span>
+      <h2>구성과 규모</h2>
+    </div>
+
+    <div class="table-scroll">
+      <table>
+        <thead><tr><th>영역</th><th>기술</th></tr></thead>
+        <tbody>
+          <tr><td>언어 · 프레임워크</td><td>Kotlin, Spring Boot 3.5, JDK 21 (가상 스레드)</td></tr>
+          <tr><td>데이터</td><td>PostgreSQL, JPA, QueryDSL, Flyway (V1–V13)</td></tr>
+          <tr><td>복원력</td><td>Resilience4j — Bulkhead · CircuitBreaker · Retry</td></tr>
+          <tr><td>관측</td><td>Micrometer, Prometheus, Grafana (대시보드 코드로 관리)</td></tr>
+          <tr><td>AI 연동</td><td>OpenAI · Claude · Gemini 어댑터, Tool Calling, MCP JSON-RPC</td></tr>
+          <tr><td>테스트</td><td>JUnit 5, Testcontainers, MockRestServiceServer, k6</td></tr>
+          <tr><td>인프라</td><td>Terraform, AWS (VPC · EC2 · SSM · VPC Endpoint · Flow Logs)</td></tr>
+          <tr><td>CI</td><td>GitHub Actions — 테스트 · 이미지 빌드 · 커밋 규칙</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>검증</h3>
+    <ul>
+      <li><strong>통합 테스트는 Testcontainers로 실제 PostgreSQL</strong>에 마이그레이션을 적용하고, <code>ddl-auto=validate</code>로 엔티티와 스키마가 어긋나면 컨텍스트가 뜨지 않게 했습니다.</li>
+      <li><strong>동시성은 가상 스레드로 실제 경합</strong>을 만들어 검증합니다. 요청을 한 줄로 세워 확인하면 주장 자체를 검증하지 못합니다.</li>
+      <li><strong>장애는 응답을 조작하는 서버</strong>를 provider 자리에 놓고 호출 횟수를 세어 확인합니다. "설정했다"가 아니라 "몇 번 호출됐나"로 증명합니다.</li>
+      <li><strong>부하는 k6</strong>로 mock provider 3초 지연 조건에서 200 VUs까지 실패율 0%, p95 3.03초를 확인했습니다.</li>
+    </ul>
+
+    <div class="note">
+      <span class="label">비용</span>
+      <p>
+        망분리 환경은 <code>apply</code> → 검증 → <code>destroy</code> 주기로 운영합니다.
+        기본 구성 기준 시간당 약 ₩75이며, 남는 것은 캡처와 Terraform 코드입니다.
+        재현할 수 없으면 산출물이라 할 수 없다는 기준으로 인프라를 코드로 관리했습니다.
+      </p>
+    </div>
+  </section>
+
+  <!-- =============== 06 =============== -->
+  <section id="limits">
+    <div class="sec-head">
+      <span class="sec-num">11</span>
+      <h2>한계</h2>
+    </div>
+
+    <p class="lead">
+      과장하지 않기 위해 적습니다. 아래는 알고 남겨둔 것들입니다.
+    </p>
+
+    <ul>
+      <li><strong>Squid는 Network Firewall의 대체재입니다.</strong> 판정 방식(도메인 허용 목록)은 같지만, 실무에서는 관리형 방화벽이나 보안 웹 게이트웨이가 맡는 자리입니다. 비용 제약 때문에 대체했습니다.</li>
+      <li><strong>계좌번호는 체크섬 검증이 불가능합니다.</strong> 은행마다 자릿수 규칙이 달라, 형식이 겹치는 사업자등록번호와 유선전화를 제외하는 방식으로 오탐을 줄였습니다. 그래서 기본 정책이 차단이 아니라 마스킹입니다.</li>
+      <li><strong>재시도가 서킷 집계를 부풀립니다.</strong> Retry가 CircuitBreaker보다 바깥이라 한 요청의 재시도가 슬라이딩 윈도우에 여러 건으로 기록됩니다. 동작은 정상이고 오히려 보수적이지만, 설정값이 보이는 그대로의 의미는 아닙니다.</li>
+      <li><strong>단일 AZ 구성입니다.</strong> 망분리 서사를 보여주는 것이 목적이라 가용성 이중화는 범위 밖으로 두었습니다.</li>
+      <li><strong>RAG와 실제 사내 문서 연동은 범위 밖입니다.</strong> Tool Calling과 MCP로 연결 규격까지 만들었고, 실제 검색 대상은 목업입니다.</li>
+    </ul>
+
+    <div class="note">
+      <span class="label">이 프로젝트에서 얻은 것</span>
+      <p>
+        기능을 붙이는 것보다 <strong>"설정으로 막았다"와 "구조적으로 못 한다"의 차이</strong>를
+        일관되게 적용하는 쪽에 시간을 더 썼습니다. 라우팅에 경로를 두지 않고, 관리 포트가
+        분리되지 않으면 기동하지 않게 하고, 지표 태그에 늘어나는 값이 들어가면 테스트가 막게 한 것이
+        모두 같은 판단입니다.
+      </p>
+    </div>
+  </section>
+
+  <footer>
+    <span>KAIROS · Enterprise AI Gateway</span>
+    <span>Kotlin · Spring Boot · AWS</span>
+    <span>github.com/Drawjustin/KAIROS</span>
+  </footer>
+
+</div>
